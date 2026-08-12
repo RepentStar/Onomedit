@@ -1,0 +1,49 @@
+name: Build Windows Executable
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Build with Nuitka
+        run: >
+          uv run --with nuitka --with zstandard --with ordered-set --
+          python -m nuitka
+          --onefile
+          --assume-yes-for-downloads
+          --enable-plugin=tk-inter
+          --include-package=onomedit
+          --include-package=ttkbootstrap
+          --include-package-data=ttkbootstrap
+          --include-package=PIL
+          --windows-console-mode=force
+          --output-dir=dist
+          --output-filename=onomedit.exe
+          scripts/nuitka_entry.py
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: onomedit-windows
+          path: dist/onomedit.exe
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/onomedit.exe
+          generate_release_notes: true
+          fail_on_unmatched_files: true
