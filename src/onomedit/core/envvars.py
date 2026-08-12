@@ -1,11 +1,8 @@
 """环境变量引擎：``<n>`` ``<d>`` 等占位符替换。
 
-要点（历史教训 3/4/6）：
-
-- ``<n>`` 递增计数跨文件延续；按 (起始, 位数, 步长) 整组作为键共享计数，
-  任一参数不同即视为新规则从起点开始。
-- 日期格式转换一次到位（直接 token 替换，不经过二次格式化）。
-- ``<r>`` / ``<rg>`` 每处独立；``<clip>`` 仅剪贴板为单行时替换，多行跳过。
+- ``<n>`` 计数跨文件延续，按 (起始, 位数, 步长) 整组共享计数。
+- 日期格式直接 token 替换，不经过二次格式化。
+- ``<r>`` / ``<rg>`` 每处独立；``<clip>`` 仅单行剪贴板替换，多行跳过。
 """
 
 from __future__ import annotations
@@ -124,7 +121,7 @@ class EnvVars:
                 return ""
             return os.path.basename(os.path.dirname(ctx.file))
         if name == "p":
-            # 图包目录：从父目录向上找第一个非隐藏目录名（Windows 属性位/点开头约定）
+            # 图包目录：从父目录向上找第一个非隐藏目录名
             if not ctx or not ctx.file:
                 return ""
             d = os.path.dirname(ctx.file)
@@ -143,10 +140,8 @@ class EnvVars:
             return str(uuid.uuid4())
         if name == "clip":
             clip = ctx.clip_text if ctx else None
-            if clip is None:
-                return None  # 无法读取：原样保留
-            if "\n" in clip or "\r" in clip:
-                return None  # 多行：跳过
+            if clip is None or "\n" in clip or "\r" in clip:
+                return None  # 无法读取或多行：原样保留
             return clip
         return None
 

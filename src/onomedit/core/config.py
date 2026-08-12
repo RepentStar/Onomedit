@@ -71,12 +71,12 @@ class SafetyOptions:
 @dataclass
 class Config:
     version: int = CONFIG_VERSION
-    # 编辑器（主/备用）
+    # 编辑器（主/备用）与等待
     editor: str = ""
     editor_alt: str = ""
     editor_timeout: float = 120.0
     multi_tab: bool = False
-    # 是否打开编辑器 / 是否应用规则：两个独立开关（历史教训 1）
+    # 两个独立开关：是否打开编辑器 / 是否应用规则
     open_editor: bool = True
     apply_rules: bool = True
     # 路径类型（四档之一，默认"不带扩展名"）
@@ -87,21 +87,16 @@ class Config:
     # 子文件夹展开（默认开启，层级 10 ≈ 全递归）
     expand_subdirs: bool = True
     subdirs_depth: int = 10
-    # 排除开关
+    # 排除 / 预览 / 安全
     exclude: ExcludeOptions = field(default_factory=ExcludeOptions)
-    # 预览开关（差异/距离）
     preview: PreviewOptions = field(default_factory=PreviewOptions)
-    # 安全选项
     safety: SafetyOptions = field(default_factory=SafetyOptions)
-    # 完成后退出（GUI：重命名执行完成（含全部无变化）后自动关闭）
+    # GUI：完成后退出 / 跳过重命名确认
     exit_after: bool = True
-    # 跳过重命名确认（GUI：编辑保存后直接执行，不弹确认窗口）
     skip_confirmation: bool = True
-    # Shell 属性列表
+    # Shell 属性 / 自动替换规则 / 临时目录（空 = 系统临时）
     shell_props: list = field(default_factory=list)
-    # 自动替换规则列表
     auto_rules: list = field(default_factory=list)
-    # 临时文件目录（可被调用方覆盖；空 = 系统临时目录）
     temp_dir: str = ""
 
 

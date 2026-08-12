@@ -1,14 +1,13 @@
 """路径封装：单个文件路径四段（全路径/目录/名/扩展名）与序列化/重命名。
 
-要点（历史教训 10）：路径段拆分必须兼容点开头文件（``.gitignore``）与
-多扩展名文件（``a.tar.gz``），序列化与反序列化严格对称。
-"""
+路径段拆分必须兼容点开头文件（``.gitignore``）与多扩展名文件（``a.tar.gz``），
+序列化与反序列化严格对称。"""
 
 from __future__ import annotations
 
 import os
 
-# 路径类型（四档：全路径/文件名含扩展名/不带扩展名/扩展名）
+# 路径类型（四档）
 PATH_TYPE_FULL = "full"
 PATH_TYPE_NAME = "name"
 PATH_TYPE_STEM = "stem"

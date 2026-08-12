@@ -1,16 +1,6 @@
 """CLI：子命令分发（先于位置参数解析）+ 各子命令实现。
 
-子命令：
-    config           查看/设置配置
-    config set       按 KEY 设置任意项（点路径 + 类型推断）
-    config set-editor 设置编辑器命令
-    config reset     重置默认配置
-    rename           编辑器模式批量重命名
-    restore          恢复上次/全部/部分
-    history          查看重命名日志
-    gui              启动图形界面
-    version          版本信息
-"""
+子命令：config / rename / restore / history / gui / version / help。"""
 
 from __future__ import annotations
 

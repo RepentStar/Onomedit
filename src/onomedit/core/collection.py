@@ -35,12 +35,8 @@ def build_items(paths: list[str]) -> list[PathItem]:
 
 
 def expand_subdirs(items: list[PathItem], depth: int) -> list[PathItem]:
-    """把目录项展开为其（限层级）子内容，返回新的项目列表。
-
-    ``depth`` 表示包含的层级数：depth=1 为直接子项（文件 + 目录），
-    depth=2 再包含下一层（子目录内的文件/目录）……层级 N = 第 1..N 层内容。
-    depth <= 0 表示不展开；展开后的目录项本身不再保留。
-    """
+    """把目录项展开为其（限层级）子内容：depth=1 为直接子项，depth=2 再含下一层；
+    depth<=0 不展开；展开后的目录项本身不再保留。"""
     if depth <= 0:
         return items
     out: list[PathItem] = []
@@ -66,10 +62,8 @@ def expand_subdirs(items: list[PathItem], depth: int) -> list[PathItem]:
 def display_base(paths: list[str]) -> str:
     """确认窗口显示基准：输入路径的公共父目录。
 
-    - 多路径：公共父目录（如 ``C:\\x\\1.txt``、``C:\\x\\2.txt`` → ``C:\\x``）
-    - 单目录：再向上取一级（选 ``C:\\a\\b`` 展开 → 显示 ``b\\...`` 而非完整路径）
-    - 不同盘符等无法计算时返回空串（调用方显示完整路径）
-    """
+    单目录输入再向上取一级（选 ``C:\\a\\b`` 展开 → 显示 ``b\\...``）；
+    无法计算（不同盘符等）时返回空串。"""
     if not paths:
         return ""
     abs_paths = [os.path.abspath(p) for p in paths]
@@ -78,8 +72,7 @@ def display_base(paths: list[str]) -> str:
     except ValueError:
         return ""
     if len(paths) == 1:
-        # 单个输入：commonpath 返回其自身（可能含文件名）→ 取目录；
-        # 目录输入则再向上取一级（选 C:\a\b 展开 → 显示 b\...）
+        # 单个输入：取目录；目录输入则再向上取一级（显示 b\... 而非完整路径）
         common = os.path.dirname(common)
     return common
 

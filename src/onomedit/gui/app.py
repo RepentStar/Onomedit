@@ -95,9 +95,7 @@ class MainWindow:
         """可选拖拽：tkinterdnd2 就绪时启用，否则提示并回退按钮。
 
         root 由 ttkbootstrap 创建（非 TkinterDnD.Tk），须用官方公开 API
-        ``TkinterDnD.require(root)`` 挂载 tkdnd；isinstance 检查对
-        ttkbootstrap 窗口永远为假（兄弟类），不可用。
-        """
+        ``TkinterDnD.require(root)`` 挂载 tkdnd。"""
         try:
             from tkinterdnd2 import TkinterDnD
 
