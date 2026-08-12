@@ -219,6 +219,9 @@ class MainWindow:
             on_done=lambda r: self._ui(
                 lambda: self._on_rename_done(r)
             ),
+            on_cancel=lambda: self._ui(
+                lambda: self._status.configure(text="重命名确认已取消")
+            ),
         )
 
     def _on_rename_done(self, result) -> None:

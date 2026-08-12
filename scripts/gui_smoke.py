@@ -62,6 +62,17 @@ def main() -> int:
     assert lw._display("C:/x/a.txt") == "a.txt"  # 相对路径
     assert len(lw.tree["columns"]) == 2, f"差异/距离关闭时应只有 2 列: {lw.tree['columns']}"
 
+    # 3.5) 强制关闭（点 X）→ on_cancel 回调触发，供主窗口刷新状态栏
+    cancelled = []
+    lw3 = ListWindow(
+        root,
+        [("C:/x/a.txt", "C:/x/b.txt")],
+        base="C:/x",
+        on_cancel=lambda: cancelled.append(1),
+    )
+    lw3._on_close()
+    assert cancelled == [1], "强制关闭应触发 on_cancel 回调"
+
     # 4) 开启差异/距离 → 确认窗口 4 列
     cfg4 = config_mod.default_config()
     cfg4.preview.diff = True

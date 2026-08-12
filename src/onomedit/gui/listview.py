@@ -19,16 +19,28 @@ class ListWindow(tk.Toplevel):
     承担"编辑后确认"角色：取消勾选的项目不执行。
     """
 
-    def __init__(self, master, pairs: list[tuple[str, str]], cfg=None, on_done=None, base: str = ""):
+    def __init__(
+        self,
+        master,
+        pairs: list[tuple[str, str]],
+        cfg=None,
+        on_done=None,
+        on_cancel=None,
+        base: str = "",
+    ):
         super().__init__(master)
         self.title("Onomedit - 重命名确认")
         self.geometry("900x560")
         self.pairs = pairs
         self.cfg = cfg or config_mod.load_config()
         self.on_done = on_done
+        self.on_cancel = on_cancel
         self.base = base  # 显示基准目录（空 = 显示完整路径）
+        self._executed = False  # 是否已执行过（防止执行后关闭再触发取消提示）
         self._build()
         self.transient(master)
+        # 强制关闭（点 X）与取消按钮一致：刷新主窗口状态栏
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
         # 默认全选
         self.tree.selection_set(self.tree.get_children())
 
@@ -69,7 +81,7 @@ class ListWindow(tk.Toplevel):
         ttk.Button(btns, text="全选", command=lambda: self._select_all(True)).pack(side="left", padx=4)
         ttk.Button(btns, text="全不选", command=lambda: self._select_all(False)).pack(side="left", padx=4)
         ttk.Button(btns, text="执行重命名", command=self._execute).pack(side="right", padx=4)
-        ttk.Button(btns, text="取消", command=self.destroy).pack(side="right", padx=4)
+        ttk.Button(btns, text="取消", command=self._on_close).pack(side="right", padx=4)
 
         self._status = ttk.Label(self, text=f"共 {len(self.pairs)} 项（已全选）")
         self._status.pack(side="bottom", fill="x", padx=8)
@@ -89,6 +101,15 @@ class ListWindow(tk.Toplevel):
         if rel.startswith(".."):
             return path
         return rel
+
+    def _on_close(self) -> None:
+        """取消 / 强制关闭（点 X）：通知主窗口刷新状态栏后销毁。
+
+        已执行过重命名时不再触发取消提示（结果提示已由 on_done 更新）。
+        """
+        if self.on_cancel and not self._executed:
+            self.on_cancel()
+        self.destroy()
 
     # ---- 勾选逻辑：Treeview 选中态作为勾选 ----
     def _selected(self) -> list[int]:
@@ -118,6 +139,7 @@ class ListWindow(tk.Toplevel):
         log = RenameLogger(config_mod.log_dir())
         log.begin_session()
         result = Renamer(log=log).run(pairs)
+        self._executed = True
         text = (
             f"完成: 成功 {len(result.success)} / 失败 {len(result.failed)}"
             f" / 无变化 {len(result.skipped)}"
