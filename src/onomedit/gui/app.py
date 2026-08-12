@@ -92,15 +92,20 @@ class MainWindow:
         self._status.pack(fill="x", pady=(6, 0))
 
     def _setup_dnd(self) -> None:
-        """可选拖拽：tkinterdnd2 未安装时静默跳过（用按钮添加）。"""
+        """可选拖拽：tkinterdnd2 就绪时启用，否则提示并回退按钮。
+
+        root 由 ttkbootstrap 创建（非 TkinterDnD.Tk），须用官方公开 API
+        ``TkinterDnD.require(root)`` 挂载 tkdnd；isinstance 检查对
+        ttkbootstrap 窗口永远为假（兄弟类），不可用。
+        """
         try:
             from tkinterdnd2 import TkinterDnD
 
-            if isinstance(self.root, TkinterDnD.Tk):
-                self.listbox.drop_target_register("DND_Files")
-                self.listbox.dnd_bind("<<Drop>>", self._on_drop)
-        except Exception:  # noqa: BLE001 - 可选能力
-            pass
+            TkinterDnD.require(self.root)
+            self.listbox.drop_target_register("DND_Files")
+            self.listbox.dnd_bind("<<Drop>>", self._on_drop)
+        except Exception as e:  # noqa: BLE001 - 可选能力
+            self._status.configure(text=f"就绪（拖拽不可用: {e}）")
 
     # ------------------------------------------------------------ 收集
     def _pick_files(self) -> None:
