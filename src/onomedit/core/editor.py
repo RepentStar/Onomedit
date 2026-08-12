@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import shlex
+import shutil
 import subprocess
 import threading
 import time
@@ -41,6 +42,24 @@ def split_command(cmd: str) -> list[str]:
     return shlex.split(cmd)
 
 
+def _resolve_command(args: list[str]) -> tuple[str, bool]:
+    """解析命令第一个 token，返回 (实际命令, 是否需经 shell 执行)。
+
+    Windows 上 ``code`` 等命令实际是 ``.cmd``/``.bat`` 批处理脚本，
+    CreateProcess 无法直接执行（报 WinError 2，但用户在终端手动执行没问题），
+    须经 ``cmd /c``（shell）启动。找不到可执行文件时抛 EditorError。
+    """
+    first = args[0]
+    if os.name != "nt":
+        return first, False
+    exe = shutil.which(first)
+    if exe is None:
+        raise EditorError(
+            f"找不到可执行文件 {first!r}，请检查 PATH 或配置编辑器完整路径"
+        )
+    return exe, exe.lower().endswith((".cmd", ".bat"))
+
+
 def launch_and_wait(
     editor_cmd: str,
     temp_path,
@@ -60,9 +79,15 @@ def launch_and_wait(
     :param on_status: 状态提示回调
     """
     args = split_command(editor_cmd)
+    exe, via_shell = _resolve_command(args)
+    # 临时文件路径作为编辑器命令的最后一个参数（编辑器打开它）
+    cmd_args = [exe, *args[1:], os.fspath(temp_path)]
     try:
-        # 临时文件路径作为编辑器命令的最后一个参数（编辑器打开它）
-        proc = subprocess.Popen([*args, os.fspath(temp_path)])
+        if via_shell:
+            # 批处理（code.cmd 等）：CreateProcess 不能直接执行，经 cmd /c
+            proc = subprocess.Popen(subprocess.list2cmdline(cmd_args), shell=True)
+        else:
+            proc = subprocess.Popen(cmd_args)
     except OSError as e:
         raise EditorError(f"无法启动编辑器 {editor_cmd!r}: {e}") from e
 

@@ -33,6 +33,24 @@ def test_editor_not_found(tmp_path):
         editor.launch_and_wait("definitely_not_a_real_editor_xyz", p, sig, timeout=0.5)
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows 专属：.cmd 批处理启动")
+def test_batch_file_editor_launches(tmp_path):
+    """Windows：code 等 .cmd 批处理须经 cmd /c 启动（WinError 2 回归）。
+
+    直接 CreateProcess 无法执行 .cmd/.bat（[WinError 2] 系统找不到指定的文件），
+    但用户在终端手动执行没问题——必须回退 shell 启动。
+    """
+    p = _write(tmp_path)
+    sig = tempfile_mgr.signature(p)
+    batch = tmp_path / "fake_code.cmd"
+    batch.write_text(
+        "@echo off\r\necho saved>> %1\r\n",
+        encoding="utf-8",
+    )
+    editor.launch_and_wait(str(batch), p, sig, timeout=5)
+    assert tempfile_mgr.changed(sig, tempfile_mgr.signature(p))
+
+
 def test_save_editor_exits_after_modify(tmp_path):
     """单实例型：编辑器修改文件后退出 → 正常继续。"""
     p = _write(tmp_path)
