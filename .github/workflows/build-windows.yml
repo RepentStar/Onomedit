@@ -19,7 +19,8 @@ jobs:
       - name: Sync dependencies
         run: uv sync --frozen --extra gui --extra dnd --extra img
 
-      - name: Build with Nuitka
+      # 完整版：含 GUI（ttkbootstrap/tkinterdnd2/Pillow）与拖拽支持
+      - name: Build full (GUI) with Nuitka
         run: >
           uv run --with nuitka --with zstandard --with ordered-set --
           python -m nuitka
@@ -37,15 +38,32 @@ jobs:
           --output-filename=onomedit.exe
           scripts/nuitka_entry.py
 
+      # 最小版：纯 CLI（不含 GUI 依赖）
+      - name: Build minimal (CLI-only) with Nuitka
+        run: >
+          uv run --with nuitka --with zstandard --with ordered-set --
+          python -m nuitka
+          --onefile
+          --assume-yes-for-downloads
+          --nofollow-import-to=onomedit.gui,ttkbootstrap,tkinterdnd2,PIL
+          --windows-console-mode=force
+          --output-dir=dist
+          --output-filename=onomedit-cli.exe
+          scripts/nuitka_entry.py
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: onomedit-windows
-          path: dist/onomedit.exe
+          path: |
+            dist/onomedit.exe
+            dist/onomedit-cli.exe
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/onomedit.exe
+          files: |
+            dist/onomedit.exe
+            dist/onomedit-cli.exe
           generate_release_notes: true
           fail_on_unmatched_files: true

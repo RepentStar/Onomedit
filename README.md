@@ -21,7 +21,9 @@
 
 ### 使用预编译二进制
 
-从 Release 下载预编译单文件二进制（推送 `v*` 标签后由 GitHub Actions 自动构建）
+从 Release 下载预编译单文件二进制（推送 `v*` 标签后由 GitHub Actions 自动构建），Release 中两种版本都具备 CLI 能力
+
+将文件移动到在 `PATH` 中的目录下即可在终端中全局使用；直接双击 exe 文件即可打开 GUI
 
 ### 从源码运行
 
@@ -163,12 +165,18 @@ pwsh scripts\build_nuitka.ps1
 - 产物内含 `ttkbootstrap` / `Pillow` / `tkinterdnd2`（含 tkdnd 库），拖拽开箱即用
 - 控制台模式 force：CLI 命令在终端输出正常；双击启动 GUI 会保留控制台窗口，
   建议从终端运行 `onomedit gui` 或创建快捷方式
-- 如需压缩构建体积可以不加入额外参数
+
+Release 提供两种产物（推送 `v*` 标签由 GitHub Actions 构建，参数见
+`.github/workflows/build-windows.yml`）：
+
+- `onomedit.exe`：完整版（含 GUI 与拖拽支持，当然也可以使用 CLI）
+- `onomedit-cli.exe`：最小体积版（纯 CLI，不含 GUI 依赖，体积约 1/3；
+  `gui` 子命令会提示缺少 GUI 依赖）
 
 ## 开发
 
 ```bash
-uv run pytest                             # 单元测试（132 项）
+uv run pytest                             # 单元测试（146 项）
 uv run python scripts/smoke_test.py       # 核心冒烟
 pwsh scripts/e2e_cli.ps1                  # CLI 端到端（假编辑器）
 uv run python scripts/gui_smoke.py        # GUI 冒烟
