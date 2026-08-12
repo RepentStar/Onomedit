@@ -6,11 +6,12 @@ from __future__ import annotations
 
 import os
 import tkinter as tk
+from tkinter import messagebox
 from tkinter import ttk
 
 from onomedit.core import config as config_mod
 from onomedit.core.logger import RenameLogger
-from onomedit.core.pipeline import Renamer, diff_text, levenshtein
+from onomedit.core.pipeline import DuplicateTargetError, Renamer, diff_text, levenshtein
 
 
 class ListWindow(tk.Toplevel):
@@ -138,7 +139,13 @@ class ListWindow(tk.Toplevel):
         pairs = [self.pairs[i] for i in indexes]
         log = RenameLogger(config_mod.log_dir())
         log.begin_session()
-        result = Renamer(log=log).run(pairs)
+        try:
+            result = Renamer(log=log).run(pairs)
+        except DuplicateTargetError as e:
+            # 勾选的项目中出现目标重名 → 警告并中止，不执行
+            self._status.configure(text=e.summary)
+            messagebox.showwarning("目标重名，已中止", str(e), parent=self)
+            return
         self._executed = True
         text = (
             f"完成: 成功 {len(result.success)} / 失败 {len(result.failed)}"

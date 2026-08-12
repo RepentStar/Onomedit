@@ -9,14 +9,20 @@ from __future__ import annotations
 import os
 import threading
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 from tkinter import ttk
 
-from onomedit.core import collection, config as config_mod, tempfile_mgr
+from onomedit.core import collection, config as config_mod
 from onomedit.core.collection import display_base
 from onomedit.core.logger import RenameLogger
 from onomedit.core.pathitem import PathItem
-from onomedit.core.pipeline import PipelineError, RenamePipeline, Renamer, restore
+from onomedit.core.pipeline import (
+    DuplicateTargetError,
+    RenamePipeline,
+    Renamer,
+    find_duplicate_targets,
+    restore,
+)
 from onomedit.gui.listview import ListWindow
 from onomedit.gui.settings import SettingsWindow
 
@@ -185,15 +191,37 @@ class MainWindow:
                 pipeline = RenamePipeline(cfg, on_status=lambda m: self._ui(lambda: self._status.configure(text=m)))
                 items, new_fulls, temp_path = pipeline.prepare(paths)
                 pairs = pipeline.plan(items, new_fulls)
+                # 读取编辑结果后立即预检目标重名：发现重名 → 警告并中止（不执行）
+                if not dry_run:
+                    conflicts = find_duplicate_targets(pairs)
+                    if conflicts:
+                        raise DuplicateTargetError(conflicts)
                 # 基准基于原始输入（展开前），保持「只显示到所选目录」语义
                 base = display_base(self.paths)
                 self._ui(
                     lambda: self._show_list(pairs, base, dry_run=dry_run, skip_confirmation=cfg.skip_confirmation)
                 )
-            except (PipelineError, tempfile_mgr.LineCountError, Exception) as e:  # noqa: BLE001
-                self._ui(lambda: self._status.configure(text=f"出错: {e}"))
+            except Exception as e:  # noqa: BLE001 - 流程错误统一提示并恢复可操作
+                # 注意：except 变量 e 在块结束后即被删除，而 self._ui 是延迟到
+                # 主线程执行（root.after），必须在此立即绑定，否则闭包读取 e 时
+                # 抛 NameError: free variable 'e'（历史踩坑）。
+                self._ui(lambda exc=e: self._finish_with_error(exc))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _finish_with_error(self, exc: Exception) -> None:
+        """后台线程出错后的统一收尾：恢复可操作状态并提示。"""
+        self._busy = False
+        self.root.configure(cursor="")
+        if isinstance(exc, DuplicateTargetError):
+            self._warn_duplicate_targets(exc)
+        else:
+            self._status.configure(text=f"出错: {exc}")
+
+    def _warn_duplicate_targets(self, exc: DuplicateTargetError) -> None:
+        """目标重名警告：状态栏摘要 + 弹窗详情（路径分行展示，可读性好）。"""
+        self._status.configure(text=exc.summary)
+        messagebox.showwarning("目标重名，已中止", str(exc), parent=self.root)
 
     def _show_list(self, pairs, base: str, *, dry_run: bool, skip_confirmation: bool = False) -> None:
         self._busy = False
@@ -204,7 +232,12 @@ class MainWindow:
             # 跳过确认模式：编辑保存后直接执行
             log = RenameLogger(config_mod.log_dir())
             log.begin_session()
-            result = Renamer(log=log).run(pairs)
+            try:
+                result = Renamer(log=log).run(pairs)
+            except DuplicateTargetError as e:
+                # 防御性兜底：worker 已预检，此处再触发则警告并中止且不退出
+                self._warn_duplicate_targets(e)
+                return
             self._status.configure(
                 text=f"重命名完成: 成功 {len(result.success)} / 失败 {len(result.failed)}"
                 f" / 无变化 {len(result.skipped)}"
@@ -239,7 +272,11 @@ class MainWindow:
 
     def _restore_last(self) -> None:
         log = RenameLogger(config_mod.log_dir())
-        result = restore(log)
+        try:
+            result = restore(log)
+        except DuplicateTargetError as e:
+            self._warn_duplicate_targets(e)
+            return
         self._status.configure(
             text=f"恢复完成: 成功 {len(result.success)} / 失败 {len(result.failed)} / 无变化 {len(result.skipped)}"
         )

@@ -323,9 +323,17 @@ def _cmd_restore(args) -> int:
         if len(kept) > len(lines):
             print("错误: 筛选后的行数超过原始行数，已中止", file=sys.stderr)
             return 1
-        result = restore(log, partial_lines=kept)
+        try:
+            result = restore(log, partial_lines=kept)
+        except PipelineError as e:
+            print(f"错误: {e}", file=sys.stderr)
+            return 1
     else:
-        result = restore(log, all_history=args.all)
+        try:
+            result = restore(log, all_history=args.all)
+        except PipelineError as e:
+            print(f"错误: {e}", file=sys.stderr)
+            return 1
 
     print(
         f"恢复完成: 成功 {len(result.success)} / 失败 {len(result.failed)}"

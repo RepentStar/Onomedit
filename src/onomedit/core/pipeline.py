@@ -17,6 +17,46 @@ class PipelineError(RuntimeError):
     """主流程中止级错误（无文件、未配置编辑器、行数校验失败等）。"""
 
 
+class DuplicateTargetError(PipelineError):
+    """目标重名：编辑结果中多个文件指向同一目标路径，中止执行（不执行任何重命名）。"""
+
+    def __init__(self, conflicts: list[tuple[str, list[str]]]):
+        self.conflicts = conflicts
+        # 每组冲突：目标单独一行、每个源文件各占一行，避免长路径挤在同一行
+        lines = ["检测到目标重名，已中止（未执行任何重命名）:"]
+        for new, olds in conflicts:
+            lines.append(f"  目标: {new}")
+            for old in olds:
+                lines.append(f"    <- {old}")
+        super().__init__("\n".join(lines))
+
+    @property
+    def summary(self) -> str:
+        """状态栏用的一句话摘要。"""
+        groups = len(self.conflicts)
+        involved = sum(len(olds) for _, olds in self.conflicts)
+        return f"检测到目标重名，已中止（未执行任何重命名）: {groups} 组目标、涉及 {involved} 个文件"
+
+
+def find_duplicate_targets(pairs: list[tuple[str, str]]) -> list[tuple[str, list[str]]]:
+    """找出目标重名组：不同源文件最终指向同一目标路径。
+
+    - Windows 文件系统大小写不敏感：``same.txt`` 与 ``SAME.TXT`` 视为同一目标。
+    - 无变化项（``old == new``，保持原名）不算"重命名到重名目标"，不参与判定。
+
+    返回 ``[(目标路径, [源路径, ...]), ...]``，按目标首次出现顺序，仅含重复组。
+    """
+    groups: dict[str, list[str]] = {}
+    first: dict[str, str] = {}  # 规范化键 → 首次出现的原始目标写法（用于显示）
+    for old, new in pairs:
+        if old == new:
+            continue
+        key = os.path.normcase(new)
+        first.setdefault(key, new)
+        groups.setdefault(key, []).append(old)
+    return [(first[key], groups[key]) for key in groups if len(groups[key]) > 1]
+
+
 @dataclass
 class RenameResult:
     """批量重命名结果：成功 / 失败 / 无变化（跳过）。"""
@@ -96,19 +136,15 @@ class Renamer:
         self._tmp_seq = 0
 
     def run(self, pairs: list[tuple[str, str]]) -> RenameResult:
-        seen: dict[str, str] = {}
-        clean: list[tuple[str, str]] = []
-        for old, new in pairs:
-            if new in seen:
-                self.result.failed.append((old, new, "目标冲突：与其他文件同名"))
-                self._log_error(f"{old} -> {new}: 目标冲突（与其他文件同名）")
-                continue
-            seen[new] = old
-            clean.append((old, new))
+        # 目标重名预检：发现重名必须中止（不执行任何重命名），
+        # 避免"多个目标名相同，最终只改其中一个"。
+        conflicts = find_duplicate_targets(pairs)
+        if conflicts:
+            raise DuplicateTargetError(conflicts)
 
         # 第一阶段：移走冲突目标 + 完成无冲突改名
-        self._pending = {old: new for old, new in clean}
-        for old, new in clean:
+        self._pending = {old: new for old, new in pairs}
+        for old, new in pairs:
             if old in self._removed:
                 continue  # 内容已被链处理移走，其落位在第二阶段
             self._do(old, new)

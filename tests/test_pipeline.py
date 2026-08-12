@@ -9,11 +9,13 @@ from onomedit.core.envvars import EnvContext, EnvVars
 from onomedit.core.logger import RenameLogger
 from onomedit.core.pathitem import PathItem
 from onomedit.core.pipeline import (
+    DuplicateTargetError,
     PipelineError,
     PipelineOutcome,
     RenamePipeline,
     Renamer,
     diff_text,
+    find_duplicate_targets,
     levenshtein,
     restore,
 )
@@ -170,15 +172,100 @@ def test_restore_partial_lines(tmp_path, isolated_config):
 
 # ---------------------------------------------------------------- 执行器细节
 def test_duplicate_target_fails(tmp_path):
+    """目标重名 → 抛 DuplicateTargetError 并中止，未执行任何重命名（不"只改其中一个"）。"""
     a = tmp_path / "a.txt"
     b = tmp_path / "b.txt"
     a.write_text("1", encoding="utf-8")
     b.write_text("2", encoding="utf-8")
     target = str(tmp_path / "same.txt")
-    result = Renamer().run([(str(a), target), (str(b), target)])
-    assert len(result.failed) == 1  # 目标重复预检
-    assert len(result.success) == 1
-    assert (tmp_path / "same.txt").exists()
+    with pytest.raises(DuplicateTargetError) as excinfo:
+        Renamer().run([(str(a), target), (str(b), target)])
+    msg = str(excinfo.value)
+    # 警告信息包含重复目标与涉及的源文件，且目标/源分行展示（可读性）
+    assert f"  目标: {target}" in msg
+    assert f"    <- {a}" in msg
+    assert f"    <- {b}" in msg
+    # 状态栏用一句话摘要
+    assert excinfo.value.summary == "检测到目标重名，已中止（未执行任何重命名）: 1 组目标、涉及 2 个文件"
+    # 中止：两个源文件都未动，目标文件未产生
+    assert (tmp_path / "a.txt").exists()
+    assert (tmp_path / "b.txt").exists()
+    assert not (tmp_path / "same.txt").exists()
+
+
+def test_duplicate_target_case_insensitive(tmp_path):
+    """Windows 文件系统大小写不敏感：same.txt 与 SAME.TXT 视为同一目标；
+    POSIX 上大小写敏感则正常执行。"""
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    a.write_text("1", encoding="utf-8")
+    b.write_text("2", encoding="utf-8")
+    t1 = str(tmp_path / "same.txt")
+    t2 = str(tmp_path / "SAME.TXT")
+    if os.path.normcase(t1) == os.path.normcase(t2):
+        with pytest.raises(DuplicateTargetError):
+            Renamer().run([(str(a), t1), (str(b), t2)])
+        assert not (tmp_path / "same.txt").exists()
+    else:
+        result = Renamer().run([(str(a), t1), (str(b), t2)])
+        assert len(result.success) == 2
+
+
+def test_unchanged_item_not_duplicate_target(tmp_path):
+    """保持原名（old == new）不算"重命名到重名目标"，不触发重名中止。"""
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    a.write_text("1", encoding="utf-8")
+    b.write_text("2", encoding="utf-8")
+    # a→b 且 b 保持原名：按既有链/真冲突逻辑处理，而非重名中止
+    result = Renamer().run([(str(a), str(b)), (str(b), str(b))])
+    assert result.failed == []
+    assert (tmp_path / "b.txt").exists()
+
+
+def test_find_duplicate_targets_groups():
+    """find_duplicate_targets 分组：三源同一目标、两目标名不同、无变化项忽略。"""
+    conflicts = find_duplicate_targets(
+        [("/d/a.txt", "/d/same.txt"), ("/d/b.txt", "/d/same.txt"), ("/d/c.txt", "/d/other.txt")]
+    )
+    assert len(conflicts) == 1
+    new, olds = conflicts[0]
+    assert new == "/d/same.txt"
+    assert olds == ["/d/a.txt", "/d/b.txt"]
+    # 无变化项不参与判定
+    assert find_duplicate_targets([("/d/a.txt", "/d/a.txt"), ("/d/b.txt", "/d/b.txt")]) == []
+
+
+def test_duplicate_target_error_multiple_groups_format():
+    """多组重名：警告按组分行展示，每组目标一行、每个源文件一行。"""
+    err = DuplicateTargetError(
+        [("/d/same.txt", ["/d/a.txt", "/d/b.txt", "/d/c.txt"]), ("/d/other.txt", ["/d/d.txt", "/d/e.txt"])]
+    )
+    msg = str(err)
+    lines = msg.splitlines()
+    assert lines[0] == "检测到目标重名，已中止（未执行任何重命名）:"
+    assert lines[1] == "  目标: /d/same.txt"
+    assert lines[2:5] == ["    <- /d/a.txt", "    <- /d/b.txt", "    <- /d/c.txt"]
+    assert lines[5] == "  目标: /d/other.txt"
+    assert lines[6:8] == ["    <- /d/d.txt", "    <- /d/e.txt"]
+    assert err.summary == "检测到目标重名，已中止（未执行任何重命名）: 2 组目标、涉及 5 个文件"
+
+
+def test_duplicate_target_aborts_flow(tmp_path, isolated_config):
+    """流程级：编辑/规则产生目标重名 → 抛 DuplicateTargetError，不执行任何重命名。"""
+    paths = _make_files(tmp_path)
+    cfg = _cfg(
+        tmp_path,
+        open_editor=False,
+        auto_rules=[Rule(scope="stem", kind="regex", find=r"^[abc]$", replace="same")],
+    )
+    with pytest.raises(DuplicateTargetError):
+        RenamePipeline(cfg).run_editor_mode(paths)
+    # 中止：三个源文件都未动，目标文件未产生
+    assert (tmp_path / "a.txt").exists()
+    assert (tmp_path / "b.txt").exists()
+    assert (tmp_path / "c.txt").exists()
+    assert not (tmp_path / "same.txt").exists()
 
 
 def test_real_conflict_numbered(tmp_path):
