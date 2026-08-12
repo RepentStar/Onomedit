@@ -13,6 +13,8 @@ uv run python -m nuitka `
     --include-package=onomedit `
     --include-package=ttkbootstrap `
     --include-package-data=ttkbootstrap `
+    --include-package=tkinterdnd2 `
+    --include-package-data=tkinterdnd2 `
     --include-package=PIL `
     --windows-console-mode=force `
     --output-dir=dist `

@@ -17,7 +17,7 @@ jobs:
         uses: astral-sh/setup-uv@v3
 
       - name: Sync dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --extra gui --extra dnd --extra img
 
       - name: Build with Nuitka
         run: >
@@ -29,6 +29,8 @@ jobs:
           --include-package=onomedit
           --include-package=ttkbootstrap
           --include-package-data=ttkbootstrap
+          --include-package=tkinterdnd2
+          --include-package-data=tkinterdnd2
           --include-package=PIL
           --windows-console-mode=force
           --output-dir=dist
