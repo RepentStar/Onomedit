@@ -117,7 +117,8 @@ def build_parser() -> argparse.ArgumentParser:
             "示例:\n"
             "  onomedit rename a.txt b.txt\n"
             "  onomedit rename *.jpg --dry-run\n"
-            "  onomedit rename --no-editor --path-type name  仅应用规则不拉起编辑器"
+            "  onomedit rename --no-editor --path-type name  仅应用规则不拉起编辑器\n"
+            "  onomedit rename *.txt --exclude h d --dry-run  临时排除隐藏文件与目录"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False,
@@ -128,6 +129,17 @@ def build_parser() -> argparse.ArgumentParser:
     p_rename.add_argument("--path-type", choices=config_mod.PATH_TYPES, help="覆盖路径类型")
     p_rename.add_argument("--multi-tab", action="store_true", help="多标签编辑器：直接轮询等保存")
     p_rename.add_argument("--timeout", type=float, help="编辑器等待超时（秒）")
+    p_rename.add_argument(
+        "--exclude",
+        nargs="+",
+        action="append",
+        choices=config_mod.EXCLUDE_TAGS,
+        metavar="TYPE",
+        help=(
+            "临时排除路径类型（可多次/多值）：f/file 文件、d/dir 目录、l/link 符号链接、"
+            "r/readonly 只读、h/hidden 隐藏、s/system 系统；在现有配置 exclude.* 基础上追加"
+        ),
+    )
     p_rename.set_defaults(handler=_cmd_rename)
 
     # restore
@@ -244,6 +256,10 @@ def _cmd_rename(args) -> int:
         cfg.editor_timeout = args.timeout
     if args.no_editor:
         cfg.open_editor = False
+    if args.exclude:
+        # 扁平化多组 tag，在现有配置基础上追加（不改配置文件）
+        tags = [tag for group in args.exclude for tag in group]
+        cfg.exclude = config_mod.merge_exclude_tags(cfg.exclude, tags)
 
     pipeline = RenamePipeline(cfg, on_status=lambda msg: print(msg, flush=True))
     try:

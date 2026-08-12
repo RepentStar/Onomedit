@@ -205,3 +205,35 @@ def test_migrate_noop_on_current():
     cfg = config_mod.default_config()
     migrated = config_mod.migrate(cfg)
     assert migrated.version == config_mod.CONFIG_VERSION
+
+
+# ---------------------------------------------------------------- 临时排除（--exclude）合并
+def test_merge_exclude_tags_aliases():
+    base = config_mod.ExcludeOptions()
+    merged = config_mod.merge_exclude_tags(base, ["f", "d", "l", "r", "h", "s"])
+    assert merged.files and merged.dirs and merged.symlinks
+    assert merged.readonly and merged.hidden and merged.system
+    # 全名与别名等价
+    assert config_mod.merge_exclude_tags(base, ["file"]).files
+    assert config_mod.merge_exclude_tags(base, ["dir"]).dirs
+    assert config_mod.merge_exclude_tags(base, ["link"]).symlinks
+    assert config_mod.merge_exclude_tags(base, ["readonly"]).readonly
+    assert config_mod.merge_exclude_tags(base, ["hidden"]).hidden
+    assert config_mod.merge_exclude_tags(base, ["system"]).system
+
+
+def test_merge_exclude_tags_preserves_base_and_defaults():
+    base = config_mod.ExcludeOptions(files=True, hidden=False)
+    merged = config_mod.merge_exclude_tags(base, ["h"])
+    assert merged.files is True  # 已有排除位保留
+    assert merged.hidden is True  # 新增位打开
+    assert merged.system is True  # 默认值保留
+    assert merged.dirs is False  # 未指定保持关闭
+    # 原对象不受影响（“临时排除”不写回配置）
+    assert base.files is True and base.hidden is False
+
+
+def test_merge_exclude_tags_no_tags_returns_copy():
+    base = config_mod.ExcludeOptions(readonly=True)
+    merged = config_mod.merge_exclude_tags(base, [])
+    assert merged is not base and merged.readonly is True

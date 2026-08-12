@@ -43,6 +43,7 @@ onomedit rename file1.txt "*.jpg"   # 拉起编辑器 → 修改 → 保存 → 
 onomedit rename folder/             # 目录默认展开子文件夹（层级 10）
 onomedit rename                     # 缺省读剪贴板中的路径
 onomedit rename *.txt --dry-run     # 预览（不执行）
+onomedit rename *.txt --exclude h d --dry-run  # 临时排除隐藏文件与目录
 onomedit restore                    # 恢复上次重命名
 onomedit gui                        # 启动 GUI；无参数运行默认打开 GUI
 ```
@@ -53,7 +54,7 @@ onomedit gui                        # 启动 GUI；无参数运行默认打开 G
 | ------------------ | ------------------------------------------------------------------------- |
 | `help 【子命令】`  | 帮助与示例                                                                |
 | `config`           | 查看配置；`config set KEY VALUE`、`config set-editor CMD`、`config reset` |
-| `rename 【路径…】` | 批量重命名（`--dry-run` / `--no-editor` / `--path-type` / `--timeout`）   |
+| `rename 【路径…】` | 批量重命名（`--dry-run` / `--no-editor` / `--path-type` / `--multi-tab` / `--timeout` / `--exclude`） |
 | `restore`          | 恢复上次；`--all` 全部历史；`--partial` 编辑器筛选恢复                    |
 | `history [--all]`  | 查看重命名日志                                                            |
 | `gui` / `version`  | 图形界面 / 版本号                                                         |
@@ -108,6 +109,24 @@ onomedit config set auto_rules '[{"scope":"stem","kind":"replace","find":"old","
 | `name` | 文件名（含扩展名） | `a.tar.gz`              |
 | `stem` | 不带扩展名         | `a.tar`                 |
 | `ext`  | 扩展名（含点）     | `.gz`                   |
+
+## 临时排除（`--exclude`）
+
+`rename` 支持用 `--exclude TYPE…` 临时排除路径类型，只对本次重命名生效，
+不改配置文件；未列出的类型沿用现有配置 `exclude.*` 的取值（默认排除符号链接/隐藏/系统）。
+参数可多值、可重复（如 `--exclude f h` 与 `--exclude f --exclude h` 等价）：
+
+| tag | 含义        | tag | 含义            |
+| --- | ----------- | --- | --------------- |
+| `f` / `file`    | 文件   | `l` / `link`     | 符号链接        |
+| `d` / `dir`     | 目录   | `r` / `readonly` | 只读            |
+| `h` / `hidden`  | 隐藏   | `s` / `system`   | 系统            |
+
+```bash
+onomedit rename *.jpg --exclude d        # 排除目录（子文件夹展开后过滤）
+onomedit rename folder/ --exclude h s    # 排除隐藏与系统文件
+onomedit rename *.txt --exclude f --dry-run  # 排除普通文件，仅预览
+```
 
 ## 配置
 

@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import sys
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -23,6 +24,37 @@ class ExcludeOptions:
     readonly: bool = False
     hidden: bool = True
     system: bool = True
+
+
+# ``rename --exclude`` 命令行 tag → ExcludeOptions 字段映射（别名成对）
+EXCLUDE_TAG_MAP: dict[str, str] = {
+    "f": "files",
+    "file": "files",
+    "d": "dirs",
+    "dir": "dirs",
+    "l": "symlinks",
+    "link": "symlinks",
+    "r": "readonly",
+    "readonly": "readonly",
+    "h": "hidden",
+    "hidden": "hidden",
+    "s": "system",
+    "system": "system",
+}
+# argparse choices 用：全部合法 tag
+EXCLUDE_TAGS: tuple[str, ...] = tuple(EXCLUDE_TAG_MAP)
+
+
+def merge_exclude_tags(base: ExcludeOptions, tags: Iterable[str]) -> ExcludeOptions:
+    """把 ``--exclude`` 的 tag 合并进排除配置：在 base 基础上打开对应位。
+
+    返回新的 ExcludeOptions，不改动 base（保证"临时排除"不影响持久化配置）；
+    未列出的排除位沿用 base 的当前值。
+    """
+    merged = ExcludeOptions(**vars(base))
+    for tag in tags:
+        setattr(merged, EXCLUDE_TAG_MAP[tag], True)
+    return merged
 
 
 @dataclass
