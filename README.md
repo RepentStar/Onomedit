@@ -50,14 +50,14 @@ onomedit gui                        # 启动 GUI；无参数运行默认打开 G
 
 ## 子命令一览
 
-| 子命令             | 说明                                                                      |
-| ------------------ | ------------------------------------------------------------------------- |
-| `help 【子命令】`  | 帮助与示例                                                                |
-| `config`           | 查看配置；`config set KEY VALUE`、`config set-editor CMD`、`config reset` |
-| `rename 【路径…】` | 批量重命名（`--dry-run` / `--no-editor` / `--path-type` / `--multi-tab` / `--timeout` / `--exclude`） |
-| `restore`          | 恢复上次；`--all` 全部历史；`--partial` 编辑器筛选恢复                    |
-| `history [--all]`  | 查看重命名日志                                                            |
-| `gui` / `version`  | 图形界面 / 版本号                                                         |
+| 子命令            | 说明                                                                                                  |
+| ----------------- | ----------------------------------------------------------------------------------------------------- |
+| `help 【子命令】` | 帮助与示例                                                                                            |
+| `config`          | 查看配置；`config set KEY VALUE`、`config set-editor CMD`、`config reset`                             |
+| `rename [PATH]`   | 批量重命名（`--dry-run` / `--no-editor` / `--path-type` / `--multi-tab` / `--timeout` / `--exclude`） |
+| `restore`         | 恢复上次；`--all` 全部历史；`--partial` 编辑器筛选恢复                                                |
+| `history [--all]` | 查看重命名日志                                                                                        |
+| `gui` / `version` | 图形界面 / 版本号                                                                                     |
 
 ## GUI 用法
 
@@ -101,6 +101,9 @@ onomedit config set auto_rules '[{"scope":"stem","kind":"replace","find":"old","
 | `insert` / `insert_at`  | 插入文本 / 位置（`start`/`end`）                                                     |
 | `condition` / `enabled` | 条件正则（不匹配跳过）/ 是否启用                                                     |
 
+> [!TIP]
+> 此功能不推荐使用，建议使用编辑器中的搜索替换，使用熟悉的编辑器中的可视化操作更简单易懂。如果有自动化替换需求可以使用编辑器的宏功能，大多数高级编辑器都有，例如 Vim
+
 ## 路径类型（编辑范围）
 
 | 类型   | 临时文件行         | 示例（`C:\x\a.tar.gz`） |
@@ -116,11 +119,11 @@ onomedit config set auto_rules '[{"scope":"stem","kind":"replace","find":"old","
 不改配置文件；未列出的类型沿用现有配置 `exclude.*` 的取值（默认排除符号链接/隐藏/系统）。
 参数可多值、可重复（如 `--exclude f h` 与 `--exclude f --exclude h` 等价）：
 
-| tag | 含义        | tag | 含义            |
-| --- | ----------- | --- | --------------- |
-| `f` / `file`    | 文件   | `l` / `link`     | 符号链接        |
-| `d` / `dir`     | 目录   | `r` / `readonly` | 只读            |
-| `h` / `hidden`  | 隐藏   | `s` / `system`   | 系统            |
+| tag            | 含义 | tag              | 含义     |
+| -------------- | ---- | ---------------- | -------- |
+| `f` / `file`   | 文件 | `l` / `link`     | 符号链接 |
+| `d` / `dir`    | 目录 | `r` / `readonly` | 只读     |
+| `h` / `hidden` | 隐藏 | `s` / `system`   | 系统     |
 
 ```bash
 onomedit rename *.jpg --exclude d        # 排除目录（子文件夹展开后过滤）
@@ -160,17 +163,17 @@ pwsh scripts\build_nuitka.ps1
 - 产物内含 `ttkbootstrap` / `Pillow` / `tkinterdnd2`（含 tkdnd 库），拖拽开箱即用
 - 控制台模式 force：CLI 命令在终端输出正常；双击启动 GUI 会保留控制台窗口，
   建议从终端运行 `onomedit gui` 或创建快捷方式
-- GitHub Actions：推送 `v*` 标签自动构建，制品上传为 `onomedit-windows`
+- 如需压缩构建体积可以不加入额外参数
 
 ## 开发
 
 ```bash
-uv run pytest                          # 单元测试（132 项）
-uv run python scripts/smoke_test.py    # 核心冒烟
-pwsh scripts/e2e_cli.ps1               # CLI 端到端（假编辑器）
-uv run python scripts/gui_smoke.py     # GUI 冒烟
+uv run pytest                             # 单元测试（132 项）
+uv run python scripts/smoke_test.py       # 核心冒烟
+pwsh scripts/e2e_cli.ps1                  # CLI 端到端（假编辑器）
+uv run python scripts/gui_smoke.py        # GUI 冒烟
 uv run python scripts/clipboard_check.py  # 剪贴板验证
-pwsh scripts/build_nuitka.ps1          # Nuitka 打包
+pwsh scripts/build_nuitka.ps1             # Nuitka 打包
 ```
 
 打包入口：`scripts/nuitka_entry.py`；测试工具：`tests/fakeditor.py`（假编辑器）、
