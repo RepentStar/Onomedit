@@ -21,16 +21,17 @@
 
 ### 使用预编译二进制
 
-从 Release 下载预编译单文件二进制
+从 Release 下载预编译单文件二进制（推送 `v*` 标签后由 GitHub Actions 自动构建）
 
 ### 从源码运行
 
 ```bash
-uv sync                       # 源码运行（开发环境，含测试与打包依赖）
-uv sync --extra gui           # 或仅 GUI 依赖
+uv sync                          # 源码运行（开发环境，含测试与打包依赖）
+uv sync --extra gui --extra dnd  # 或仅 GUI 依赖（界面 + 拖拽）
 ```
 
 > 可选依赖：`pywin32`（Shell 属性）、`Pillow`（图片尺寸）、`tkinterdnd2`（GUI 拖拽）。
+> 拖拽为可选能力：未安装 `tkinterdnd2` 时状态栏会提示原因，仍可用按钮/剪贴板添加。
 > 也可用 Nuitka 打包为单文件 exe，见[打包](#打包-nuitka)。
 
 ## 快速开始（CLI）
@@ -60,6 +61,7 @@ onomedit gui                        # 启动 GUI；无参数运行默认打开 G
 ## GUI 用法
 
 - **主窗口**：添加文件（按钮 / 文件夹 / 剪贴板 / 拖拽）、选择路径类型与展开层级；
+  拖拽需安装 `tkinterdnd2`（`uv sync --extra dnd`），未安装时状态栏提示并回退按钮；
   点「开始」后台完成「收集 → 展开 → 过滤 → 写临时文件 → 拉起并等待编辑器」，不冻结界面
 - **执行与确认**：默认「跳过确认」直接执行；关闭后弹出确认窗口（差异/距离可配置列、
   默认全选、路径相对所选目录显示、全部成功后自动关闭）
@@ -128,21 +130,23 @@ onomedit config set auto_rules '[{"scope":"stem","kind":"replace","find":"old","
 
 ## 打包（Nuitka）
 
-生成单文件 `dist\onomedit.exe`（Windows，含 GUI）：
+生成单文件 `dist\onomedit.exe`（Windows，含 GUI 与拖拽支持）：
 
 ```bash
-uv sync
+uv sync --extra gui --extra dnd --extra img
 pwsh scripts\build_nuitka.ps1
 ```
 
 - 在 uv 环境中打包（nuitka/zstandard 为 dev 依赖）；首次自动下载 MinGW64 编译器
+- 产物内含 `ttkbootstrap` / `Pillow` / `tkinterdnd2`（含 tkdnd 库），拖拽开箱即用
 - 控制台模式 force：CLI 命令在终端输出正常；双击启动 GUI 会保留控制台窗口，
   建议从终端运行 `onomedit gui` 或创建快捷方式
+- GitHub Actions：推送 `v*` 标签自动构建，制品上传为 `onomedit-windows`
 
 ## 开发
 
 ```bash
-uv run pytest                          # 单元测试（135 项）
+uv run pytest                          # 单元测试（132 项）
 uv run python scripts/smoke_test.py    # 核心冒烟
 pwsh scripts/e2e_cli.ps1               # CLI 端到端（假编辑器）
 uv run python scripts/gui_smoke.py     # GUI 冒烟
