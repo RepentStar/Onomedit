@@ -28,7 +28,7 @@ sdist = { url = "https://pypi.tuna.tsinghua.edu.cn/packages/3f/d8/bdb7febea4b4fe
 
 [[package]]
 name = "onomedit"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "." }
 
 [package.optional-dependencies]
