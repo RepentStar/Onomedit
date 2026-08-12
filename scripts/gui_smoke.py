@@ -61,6 +61,9 @@ def main() -> int:
     assert len(lw.tree.selection()) == 2  # 默认全选
     assert lw._display("C:/x/a.txt") == "a.txt"  # 相对路径
     assert len(lw.tree["columns"]) == 2, f"差异/距离关闭时应只有 2 列: {lw.tree['columns']}"
+    assert all(
+        lw.tree.column(c)["anchor"] == "center" for c in lw.tree["columns"]
+    ), "所有数据列应居中显示"
 
     # 3.5) 强制关闭（点 X）→ on_cancel 回调触发，供主窗口刷新状态栏
     cancelled = []
@@ -79,6 +82,9 @@ def main() -> int:
     cfg4.preview.distance = True
     lw4 = ListWindow(root, [("C:/x/a.txt", "C:/x/b.txt")], cfg=cfg4, base="C:/x")
     assert len(lw4.tree["columns"]) == 4, f"开启后应为 4 列: {lw4.tree['columns']}"
+    assert all(
+        lw4.tree.column(c)["anchor"] == "center" for c in lw4.tree["columns"]
+    ), "开启差异/距离后所有列也应居中显示"
 
     sw = SettingsWindow(root)
 

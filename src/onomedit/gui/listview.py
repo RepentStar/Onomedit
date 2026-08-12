@@ -60,7 +60,7 @@ class ListWindow(tk.Toplevel):
         for col, head in zip(cols, headers):
             tree.heading(col, text=head)
             width = 120 if col in ("old", "new") else 260
-            tree.column(col, width=width, anchor="w")
+            tree.column(col, width=width, anchor="center")
 
         vsb = ttk.Scrollbar(self, orient="vertical", command=tree.yview)
         tree.configure(yscrollcommand=vsb.set)
