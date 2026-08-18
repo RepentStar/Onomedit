@@ -124,12 +124,20 @@ onomedit config set auto_rules '[{"scope":"stem","kind":"replace","find":"old","
 
 ## 路径类型（编辑范围）
 
+编辑范围 = 临时文件中每行显示并供编辑的内容。配置键 `path_type`（默认 `stem`，GUI 设置窗口「路径类型」下拉框）；CLI 用 `--path-type TYPE` 临时覆盖，只对本次重命名生效，不改配置文件：
+
 | 类型   | 临时文件行         | 示例（`C:\x\a.tar.gz`） |
 | ------ | ------------------ | ----------------------- |
 | `full` | 全路径             | `C:\x\a.tar.gz`         |
 | `name` | 文件名（含扩展名） | `a.tar.gz`              |
 | `stem` | 不带扩展名         | `a.tar`                 |
 | `ext`  | 扩展名（含点）     | `.gz`                   |
+
+```bash
+onomedit rename *.jpg --path-type name     # 本次编辑文件名（临时覆盖 path_type）
+onomedit rename folder/ --path-type full   # 本次编辑全路径（可在编辑器中改目录移动文件）
+onomedit rename *.txt --path-type stem --no-editor --dry-run  # 不带扩展名，跳过编辑器直接预览
+```
 
 ## 重命名顺序（`sort_by` / `--sort-by`）
 
@@ -214,17 +222,10 @@ uv sync --extra gui --extra dnd --extra img
 pwsh scripts\build_nuitka.ps1
 ```
 
-- 在 uv 环境中打包（nuitka/zstandard 为 dev 依赖）；首次自动下载 MinGW64 编译器
-- 产物内含 `ttkbootstrap` / `Pillow` / `tkinterdnd2`（含 tkdnd 库），拖拽开箱即用
-- 控制台模式 force：CLI 命令在终端输出正常；双击启动 GUI 会保留控制台窗口，
-  建议从终端运行 `onomedit gui` 或创建快捷方式
+Release 提供两种产物（推送 `v*` 标签由 GitHub Actions 自动构建）：
 
-Release 提供两种产物（推送 `v*` 标签由 GitHub Actions 构建，参数见
-`.github/workflows/build-windows.yml`）：
-
-- `onomedit.exe`：完整版（含 GUI 与拖拽支持，当然也可以使用 CLI）
-- `onomedit-cli.exe`：最小体积版（纯 CLI，不含 GUI 依赖，体积约 1/3；
-  `gui` 子命令会提示缺少 GUI 依赖）
+- `onomedit.exe`：完整版（含 GUI 与拖拽支持，也可使用 CLI）
+- `onomedit-cli.exe`：最小体积版（纯 CLI，不含 GUI 依赖；`gui` 子命令会提示缺少 GUI 依赖）
 
 ## 开发
 
