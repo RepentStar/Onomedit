@@ -178,20 +178,24 @@ class MainWindow:
         self._status.configure(text="已清空")
 
     def _refresh(self) -> None:
-        """按「展开子文件夹」勾选与层级刷新列表显示。
+        """按「展开子文件夹」勾选与层级刷新列表显示，并应用配置的排序。
 
-        勾选时把目录项展开到指定层级（文件/目录都显示），否则原样显示。
+        勾选时把目录项展开到指定层级（文件/目录都显示），否则原样显示；
+        列表显示即最终写入顺序，故展开后统一按 sort_by 排序。
         """
         self.listbox.delete(0, "end")
         depth = int(self.depth_var.get() or 1)
         expand = self.subdirs_var.get()
+        shown: list[str] = []
         for p in self.paths:
             if expand and os.path.isdir(p):
                 items = collection.expand_subdirs([PathItem(p)], depth)
-                for it in items:
-                    self.listbox.insert("end", it.full)
+                shown.extend(it.full for it in items)
             else:
-                self.listbox.insert("end", p)
+                shown.append(p)
+        items = collection.sort_items([PathItem(p) for p in shown], self.cfg.sort_by)
+        for it in items:
+            self.listbox.insert("end", it.full)
 
     # ------------------------------------------------------------ 流程
     def _start(self, *, no_editor: bool = False, dry_run: bool = False) -> None:
@@ -320,8 +324,9 @@ class MainWindow:
 
     def _open_settings(self) -> None:
         SettingsWindow(self.root, cfg=self.cfg)
-        # 保存后刷新本地配置
+        # 保存后刷新本地配置并重排列表（排序依据等变更立即生效）
         self.cfg = config_mod.load_config()
+        self._refresh()
 
     def _ui(self, fn) -> None:
         self.root.after(0, fn)

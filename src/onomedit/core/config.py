@@ -81,6 +81,8 @@ class Config:
     apply_rules: bool = True
     # 路径类型（四档之一，默认"不带扩展名"）
     path_type: str = PATH_TYPE_STEM
+    # 重命名顺序（default 原顺序 / name / path / mtime / ctime / size）
+    sort_by: str = "default"
     # 环境变量与自动替换
     enable_envvars: bool = True
     enable_auto_rules: bool = True

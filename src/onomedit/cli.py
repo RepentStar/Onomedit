@@ -10,7 +10,7 @@ import os
 import sys
 
 from onomedit import __version__
-from onomedit.core import config as config_mod
+from onomedit.core import collection, config as config_mod
 from onomedit.core import editor, tempfile_mgr
 from onomedit.core.logger import SEPARATOR, RenameLogger
 from onomedit.core.pipeline import PipelineError, RenamePipeline, restore
@@ -119,6 +119,15 @@ def build_parser() -> argparse.ArgumentParser:
     p_rename.add_argument("--path-type", choices=config_mod.PATH_TYPES, help="覆盖路径类型")
     p_rename.add_argument("--multi-tab", action="store_true", help="多标签编辑器：直接轮询等保存")
     p_rename.add_argument("--timeout", type=float, help="编辑器等待超时（秒）")
+    p_rename.add_argument(
+        "--sort-by",
+        choices=collection.SORT_BY_CHOICES,
+        metavar="KEY",
+        help=(
+            "临时重命名顺序（仅本次生效，覆盖配置 sort_by）："
+            "default 原顺序、name 名称、path 路径、mtime 修改时间、ctime 创建时间、size 大小"
+        ),
+    )
     p_rename.add_argument(
         "--exclude",
         nargs="+",
@@ -246,6 +255,8 @@ def _cmd_rename(args) -> int:
         cfg.editor_timeout = args.timeout
     if args.no_editor:
         cfg.open_editor = False
+    if args.sort_by:
+        cfg.sort_by = args.sort_by
     if args.exclude:
         # 扁平化多组 tag，在现有配置基础上追加（不改配置文件）
         tags = [tag for group in args.exclude for tag in group]

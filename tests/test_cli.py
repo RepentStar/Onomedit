@@ -35,3 +35,57 @@ def test_rename_exclude_all_choices_are_valid():
 def test_rename_without_exclude_keeps_none():
     args = build_parser().parse_args(["rename", "a.txt"])
     assert args.exclude is None
+
+
+def test_rename_sort_by_parses():
+    args = build_parser().parse_args(["rename", "a.txt", "--sort-by", "mtime"])
+    assert args.sort_by == "mtime"
+
+
+def test_rename_sort_by_invalid_rejected():
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["rename", "a.txt", "--sort-by", "zzz"])
+
+
+def test_rename_sort_by_absent_none():
+    args = build_parser().parse_args(["rename", "a.txt"])
+    assert args.sort_by is None
+
+
+def test_rename_sort_by_all_choices_are_valid():
+    from onomedit.core.collection import SORT_BY_CHOICES
+
+    args = build_parser().parse_args(["rename", "a.txt", "--sort-by", SORT_BY_CHOICES[-1]])
+    assert args.sort_by == SORT_BY_CHOICES[-1]
+
+
+def test_cmd_rename_sort_by_overrides_cfg(monkeypatch, isolated_config):
+    """--sort-by 临时覆盖配置 sort_by（不改配置文件）。"""
+    import onomedit.cli as cli_mod
+
+    captured = {}
+
+    class _Result:
+        success = []
+        failed = []
+        skipped = []
+        total = 0
+
+    class FakeOutcome:
+        dry_run = False
+        result = _Result()
+        pairs = []
+        preview = None
+
+    class FakePipeline:
+        def __init__(self, cfg, **kw):
+            captured["cfg"] = cfg
+
+        def run_editor_mode(self, paths, dry_run=False):
+            captured["paths"] = paths
+            return FakeOutcome()
+
+    monkeypatch.setattr(cli_mod, "RenamePipeline", FakePipeline)
+    args = build_parser().parse_args(["rename", "a.txt", "--sort-by", "mtime"])
+    cli_mod._cmd_rename(args)
+    assert captured["cfg"].sort_by == "mtime"

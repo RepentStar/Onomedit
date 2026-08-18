@@ -317,6 +317,29 @@ def test_sanitize_applied_in_plan(tmp_path, isolated_config):
     assert (tmp_path / "_con.txt").exists()
 
 
+# ---------------------------------------------------------------- 重命名顺序（sort_by）
+def test_sort_by_mtime_orders_prepared_items(tmp_path, isolated_config):
+    """sort_by 配置作用于 prepare 收集顺序（写入临时文件即排序后顺序）。"""
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    a.write_text("1", encoding="utf-8")
+    b.write_text("2", encoding="utf-8")
+    past = 1_000_000_000
+    os.utime(a, (past, past))
+    os.utime(b, (past + 10, past + 10))
+    cfg = _cfg(tmp_path, open_editor=False, sort_by="mtime")
+    items, _, _ = RenamePipeline(cfg).prepare([str(b), str(a)])
+    assert [i.name for i in items] == ["a.txt", "b.txt"]  # 输入顺序 b,a → 按修改时间 a,b
+
+
+def test_sort_by_default_keeps_input_order(tmp_path, isolated_config):
+    """默认不排序：输入顺序原样进入 prepare。"""
+    paths = _make_files(tmp_path)
+    cfg = _cfg(tmp_path, open_editor=False)  # sort_by 默认 default
+    items, _, _ = RenamePipeline(cfg).prepare(paths)
+    assert [i.name for i in items] == ["a.txt", "b.txt", "c.txt"]
+
+
 # ---------------------------------------------------------------- 预览工具
 def test_preview_rows(tmp_path):
     from onomedit.core.pipeline import preview_rows

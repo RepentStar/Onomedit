@@ -129,3 +129,61 @@ def test_exclude_symlink(tmp_path):
     ex = ExcludeOptions(symlinks=True)
     kept = collection.apply_excludes(items, ex)
     assert [i.full for i in kept] == [str(target)]
+
+
+# ---------------------------------------------------------------- 重命名顺序（sort_by）
+def test_sort_items_default_keeps_order(tmp_path):
+    _make_tree(tmp_path)
+    items = [PathItem(str(tmp_path / "sub")), PathItem(str(tmp_path / "a.txt"))]
+    got = collection.sort_items(items, "default")
+    assert got is items  # 不排序：原列表直接返回
+
+
+def test_sort_items_by_name_case_insensitive(tmp_path):
+    (tmp_path / "z.txt").write_text("1", encoding="utf-8")
+    (tmp_path / "A.txt").write_text("2", encoding="utf-8")
+    items = [PathItem(str(tmp_path / "z.txt")), PathItem(str(tmp_path / "A.txt"))]
+    got = collection.sort_items(items, "name")
+    assert [i.name for i in got] == ["A.txt", "z.txt"]  # normcase：A 排在 z 前
+
+
+def test_sort_items_by_path(tmp_path):
+    _make_tree(tmp_path)
+    items = [
+        PathItem(str(tmp_path / "sub" / "b.txt")),
+        PathItem(str(tmp_path / "a.txt")),
+    ]
+    got = collection.sort_items(items, "path")
+    assert [i.full for i in got] == [
+        str(tmp_path / "a.txt"),
+        str(tmp_path / "sub" / "b.txt"),
+    ]
+
+
+def test_sort_items_by_mtime(tmp_path):
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    a.write_text("1", encoding="utf-8")
+    b.write_text("2", encoding="utf-8")
+    past = 1_000_000_000
+    os.utime(a, (past, past))
+    os.utime(b, (past + 10, past + 10))
+    items = [PathItem(str(b)), PathItem(str(a))]  # 输入顺序：b 在前
+    got = collection.sort_items(items, "mtime")
+    assert [i.name for i in got] == ["a.txt", "b.txt"]  # 修改时间早的在前
+
+
+def test_sort_items_by_size(tmp_path):
+    small = tmp_path / "small.txt"
+    big = tmp_path / "big.txt"
+    small.write_text("x", encoding="utf-8")
+    big.write_text("x" * 100, encoding="utf-8")
+    items = [PathItem(str(big)), PathItem(str(small))]
+    got = collection.sort_items(items, "size")
+    assert [i.name for i in got] == ["small.txt", "big.txt"]
+
+
+def test_sort_items_unknown_key_keeps_order(tmp_path):
+    items = [PathItem(str(tmp_path / "b.txt")), PathItem(str(tmp_path / "a.txt"))]
+    got = collection.sort_items(items, "bogus")
+    assert got is items  # 未知值安全回退原顺序

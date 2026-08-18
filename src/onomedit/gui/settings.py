@@ -5,7 +5,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
-from onomedit.core import config as config_mod
+from onomedit.core import collection, config as config_mod
 from onomedit.core.pathitem import PATH_TYPES
 
 
@@ -44,6 +44,16 @@ class SettingsWindow(tk.Toplevel):
             row=0, column=1, sticky="w", pady=2
         )
         self._vars["path_type"] = path_var
+        ttk.Label(row2, text="排序依据:").grid(row=1, column=0, sticky="w", pady=2)
+        sort_var = tk.StringVar(value=self.cfg.sort_by)
+        ttk.Combobox(
+            row2,
+            textvariable=sort_var,
+            values=list(collection.SORT_BY_CHOICES),
+            state="readonly",
+            width=20,
+        ).grid(row=1, column=1, sticky="w", pady=2)
+        self._vars["sort_by"] = sort_var
         self._check("expand_subdirs", "展开子文件夹", row2)
         self._entry("subdirs_depth", "展开层级（1 = 直接子项）", row2)
 

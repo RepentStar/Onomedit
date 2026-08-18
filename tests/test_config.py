@@ -20,6 +20,7 @@ def test_default_values():
     assert cfg.preview.distance is False
     assert cfg.expand_subdirs is True
     assert cfg.subdirs_depth == 10
+    assert cfg.sort_by == "default"  # 重命名顺序默认不排序
     assert cfg.safety.sanitize is True
     assert cfg.skip_confirmation is True  # 跳过重命名确认默认开启
     assert cfg.exit_after is True  # 完成后退出默认开启
@@ -31,12 +32,14 @@ def test_to_from_dict_roundtrip():
     cfg.editor = "notepad"
     cfg.editor_timeout = 30.5
     cfg.exclude.readonly = True
+    cfg.sort_by = "mtime"
     cfg.auto_rules = [Rule(scope="stem", kind="replace", find="a", replace="b")]
     data = config_mod.to_dict(cfg)
     restored = config_mod.from_dict(data)
     assert restored.editor == "notepad"
     assert restored.editor_timeout == 30.5
     assert restored.exclude.readonly is True
+    assert restored.sort_by == "mtime"
     assert len(restored.auto_rules) == 1
     assert restored.auto_rules[0].find == "a"
 

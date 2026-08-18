@@ -1,4 +1,4 @@
-"""数据管理：文件数组构建、子文件夹展开、排除过滤。"""
+"""数据管理：文件数组构建、子文件夹展开、排除过滤、重命名排序。"""
 
 from __future__ import annotations
 
@@ -8,6 +8,22 @@ import os
 from onomedit.core.pathitem import PathItem
 from onomedit.utils import clipboard as clipboard_util
 from onomedit.utils import fileattr
+
+# 重命名顺序可选项目（默认不排序）
+SORT_BY_DEFAULT = "default"
+SORT_BY_NAME = "name"
+SORT_BY_PATH = "path"
+SORT_BY_MTIME = "mtime"
+SORT_BY_CTIME = "ctime"
+SORT_BY_SIZE = "size"
+SORT_BY_CHOICES: tuple[str, ...] = (
+    SORT_BY_DEFAULT,
+    SORT_BY_NAME,
+    SORT_BY_PATH,
+    SORT_BY_MTIME,
+    SORT_BY_CTIME,
+    SORT_BY_SIZE,
+)
 
 
 def collect_paths(raw_paths: list[str] | None, *, use_clipboard: bool = True) -> list[str]:
@@ -75,6 +91,34 @@ def display_base(paths: list[str]) -> str:
         # 单个输入：取目录；目录输入则再向上取一级（显示 b\... 而非完整路径）
         common = os.path.dirname(common)
     return common
+
+
+def sort_items(items: list[PathItem], sort_by: str = SORT_BY_DEFAULT) -> list[PathItem]:
+    """按指定项目排序重命名顺序；default 或未知值保持原顺序（不复制列表）。
+
+    名称/路径排序用 ``normcase`` 保证 Windows 上大小写不敏感且结果可预测；
+    时间/大小排序取 stat 值，stat 失败（权限等）时按 0 处理不中断流程。
+    """
+    if sort_by == SORT_BY_DEFAULT or sort_by not in SORT_BY_CHOICES:
+        return items
+    if sort_by == SORT_BY_NAME:
+        key = lambda i: os.path.normcase(i.name)
+    elif sort_by == SORT_BY_PATH:
+        key = lambda i: os.path.normcase(i.full)
+    elif sort_by == SORT_BY_MTIME:
+        key = lambda i: _stat_attr(i.full, "st_mtime")
+    elif sort_by == SORT_BY_CTIME:
+        key = lambda i: _stat_attr(i.full, "st_ctime")
+    else:  # SORT_BY_SIZE
+        key = lambda i: _stat_attr(i.full, "st_size")
+    return sorted(items, key=key)
+
+
+def _stat_attr(path: str, attr: str):
+    try:
+        return getattr(os.stat(path), attr)
+    except OSError:
+        return 0.0
 
 
 def apply_excludes(items: list[PathItem], exclude) -> list[PathItem]:
