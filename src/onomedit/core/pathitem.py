@@ -76,7 +76,7 @@ class PathItem:
 
     def rename(self, target: str | os.PathLike) -> None:
         """执行重命名；失败抛 OSError，由调用方记录。"""
-        os.rename(self.full, os.fspath(target))
+        rename_ensure_parent(self.full, os.fspath(target))
 
     def __repr__(self) -> str:  # pragma: no cover - 调试用
         return f"PathItem({self.full!r})"
@@ -86,3 +86,24 @@ class PathItem:
 
     def __hash__(self) -> int:
         return hash(self.full)
+
+
+def rename_ensure_parent(old: str, new: str) -> None:
+    """执行重命名；目标父目录缺失时先递归创建再重试一次。
+
+    全路径模式支持通过重命名移动文件，目标目录可能尚不存在（如
+    ``C:\\data\\new\\file.txt``）；此时创建缺失的父目录后再次尝试。
+    仅当源仍存在（排除源缺失导致的 ``FileNotFoundError``）时创建目录；
+    其余情况原样抛出 OSError，由调用方决定如何处理（记录失败等）。
+    """
+    try:
+        os.rename(old, new)
+        return
+    except FileNotFoundError:
+        if not os.path.exists(old):
+            raise
+        parent = os.path.dirname(new)
+        if not parent:
+            raise
+        os.makedirs(parent, exist_ok=True)
+        os.rename(old, new)
