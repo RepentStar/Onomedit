@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 from onomedit.core.pathitem import PATH_TYPES
 from onomedit.utils import transforms
 
-# 规则种类
 KIND_REPLACE = "replace"  # 普通（区分大小写）
 KIND_REPLACE_ICASE = "replace_icase"  # 普通（不区分大小写）
 KIND_REGEX = "regex"
@@ -18,7 +17,6 @@ KIND_ENV = "env"  # 仅标记：字段在环境变量阶段统一展开
 
 RULE_KINDS = (KIND_REPLACE, KIND_REPLACE_ICASE, KIND_REGEX, KIND_CONVERT, KIND_INSERT, KIND_ENV)
 
-# 插入位置
 INSERT_START = "start"
 INSERT_END = "end"
 

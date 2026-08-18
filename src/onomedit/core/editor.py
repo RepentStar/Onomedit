@@ -84,7 +84,6 @@ def launch_and_wait(
     cmd_args = [exe, *args[1:], os.fspath(temp_path)]
     try:
         if via_shell:
-            # 批处理（code.cmd 等）：CreateProcess 不能直接执行，经 cmd /c
             proc = subprocess.Popen(subprocess.list2cmdline(cmd_args), shell=True)
         else:
             proc = subprocess.Popen(cmd_args)
@@ -103,7 +102,6 @@ def launch_and_wait(
         _poll_save(temp_path, sig, timeout, status)
         return
 
-    # 默认：等待进程退出（有限超时）
     while True:
         if proc.poll() is not None:
             elapsed = time.monotonic() - start
@@ -130,7 +128,6 @@ def _poll_save(temp_path, sig, timeout: float, status) -> None:
     status("等待保存超时，继续处理")
 
 
-# ---------------------------------------------------------------- 焦点转移
 def _focus_editor_window(pid: int) -> None:
     """后台线程：等待编辑器主窗口出现并把前台焦点转给它（Windows）。
 

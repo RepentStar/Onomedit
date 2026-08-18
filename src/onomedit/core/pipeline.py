@@ -162,7 +162,6 @@ class Renamer:
                 self._log_error(f"{tmp} -> {target}: {e}")
         return self.result
 
-    # ---- 内部 ----
     def _do(self, old: str, new: str) -> None:
         if old == new:
             self._pending.pop(old, None)

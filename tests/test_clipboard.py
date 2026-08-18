@@ -11,7 +11,6 @@ from onomedit.utils import clipboard
 CF_HDROP = 15
 
 
-# ---------------------------------------------------------------- 文本解析
 def test_parse_quoted_paths_with_spaces():
     text = '"C:\\a b\\x.txt" "C:\\d\\y.txt"'
     assert clipboard._parse_path_text(text) == ["C:\\a b\\x.txt", "C:\\d\\y.txt"]
@@ -38,7 +37,6 @@ def test_parse_blank_lines_ignored():
     assert clipboard._parse_path_text("  \nC:\\a\n\n") == ["C:\\a"]
 
 
-# ---------------------------------------------------------------- HDROP
 def _clipboard_available() -> bool:
     """剪贴板是否可被当前进程独占（被其他进程占用时测试跳过）。"""
     user32 = ctypes.WinDLL("user32")
@@ -104,7 +102,6 @@ def test_win_get_hdrop_prefers_over_text():
     assert clipboard.get_paths() == ["C:\\a.txt", "C:\\b.txt"]
 
 
-# ---------------------------------------------------------------- 回环
 def test_win_clipboard_roundtrip():
     """Windows：tkinter 写入剪贴板 → ctypes 读取，内容一致。"""
     if os.name != "nt":

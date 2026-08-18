@@ -91,7 +91,6 @@ def test_cmd_rename_sort_by_overrides_cfg(monkeypatch, isolated_config):
     assert captured["cfg"].sort_by == "mtime"
 
 
-# ---------------------------------------------------------------- --depth 临时深度
 def test_rename_depth_parses():
     args = build_parser().parse_args(["rename", "folder", "--depth", "3"])
     assert args.depth == 3
@@ -146,7 +145,6 @@ def test_cmd_rename_depth_overrides_cfg(monkeypatch, isolated_config):
     assert captured["cfg"].expand_subdirs is True  # 指定深度隐含展开
 
 
-# ---------------------------------------------------------------- --reverse 反转顺序
 def test_rename_reverse_parses():
     args = build_parser().parse_args(["rename", "a.txt", "--reverse"])
     assert args.reverse is True

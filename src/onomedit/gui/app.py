@@ -36,7 +36,6 @@ class MainWindow:
         self._build()
         self._setup_dnd()
 
-    # ------------------------------------------------------------ UI 构建
     def _build(self) -> None:
         self.root.title("Onomedit - 批量重命名")
         self.root.geometry("780x560")
@@ -44,7 +43,6 @@ class MainWindow:
         main = ttk.Frame(self.root, padding=10)
         main.pack(fill="both", expand=True)
 
-        # 文件列表
         list_frame = ttk.LabelFrame(
             main, text="文件（将按此顺序写入临时文件）", padding=6
         )
@@ -56,7 +54,6 @@ class MainWindow:
         self.listbox.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
 
-        # 按钮行
         btns = ttk.Frame(main)
         btns.pack(fill="x", pady=(8, 4))
         ttk.Button(btns, text="添加文件…", command=self._pick_files).pack(
@@ -76,7 +73,6 @@ class MainWindow:
             side="right", padx=2
         )
 
-        # 选项行
         opts = ttk.Frame(main)
         opts.pack(fill="x", pady=4)
         ttk.Label(opts, text="路径类型:").pack(side="left")
@@ -104,7 +100,6 @@ class MainWindow:
         )
         self.depth_spin.pack(side="left")
 
-        # 执行
         run_frame = ttk.Frame(main)
         run_frame.pack(fill="x", pady=(4, 0))
         ttk.Button(run_frame, text="开始（打开编辑器）", command=self._start).pack(
@@ -138,7 +133,6 @@ class MainWindow:
         except Exception as e:  # noqa: BLE001 - 可选能力
             self._status.configure(text=f"就绪（拖拽不可用: {e}）")
 
-    # ------------------------------------------------------------ 收集
     def _pick_files(self) -> None:
         chosen = filedialog.askopenfilenames(parent=self.root, title="选择文件")
         self._add_paths(list(chosen))
@@ -202,7 +196,6 @@ class MainWindow:
         for it in items:
             self.listbox.insert("end", it.full)
 
-    # ------------------------------------------------------------ 流程
     def _start(self, *, no_editor: bool = False, dry_run: bool = False) -> None:
         if self._busy:
             return

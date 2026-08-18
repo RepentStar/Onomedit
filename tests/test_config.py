@@ -114,7 +114,6 @@ def test_config_dir_location(isolated_config):
     assert config_mod.config_dir().name == "Onomedit"
 
 
-# ---------------------------------------------------------------- 默认编辑器探测
 def test_ensure_default_editor_fills_when_empty(monkeypatch):
     cfg = config_mod.default_config()
     assert cfg.editor == ""
@@ -168,7 +167,6 @@ def test_load_config_keeps_configured_editor(isolated_config, monkeypatch):
     assert cfg.editor == "myeditor"
 
 
-# ---------------------------------------------------------------- 探测优先级
 def _fake_which(available: set[str]):
     """构造 shutil.which 的替身：仅 available 中的命令返回路径。"""
     return lambda name: f"C:/bin/{name}.exe" if name in available else None
@@ -213,7 +211,6 @@ def test_migrate_noop_on_current():
     assert migrated.version == config_mod.CONFIG_VERSION
 
 
-# ---------------------------------------------------------------- 临时排除（--exclude）合并
 def test_merge_exclude_tags_aliases():
     base = config_mod.ExcludeOptions()
     merged = config_mod.merge_exclude_tags(base, ["f", "d", "l", "r", "h", "s"])

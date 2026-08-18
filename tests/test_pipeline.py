@@ -44,7 +44,6 @@ def _cfg(tmp_path, **overrides):
     return cfg
 
 
-# ---------------------------------------------------------------- 完整流程
 def test_full_flow_editor_save(tmp_path, isolated_config):
     """流程 1：拉起编辑器 → 用户保存新名 → 重命名成功 + 日志。"""
     paths = _make_files(tmp_path)
@@ -139,7 +138,6 @@ def test_missing_editor_raises(tmp_path, isolated_config):
         RenamePipeline(cfg).run_editor_mode(paths)
 
 
-# ---------------------------------------------------------------- 恢复
 def test_restore_last(tmp_path, isolated_config):
     paths = _make_files(tmp_path)
     cfg = _cfg(tmp_path, open_editor=False, auto_rules=[Rule(scope="stem", kind="replace", find="a", replace="renamed")])
@@ -170,7 +168,6 @@ def test_restore_partial_lines(tmp_path, isolated_config):
     assert not z.exists()
 
 
-# ---------------------------------------------------------------- 执行器细节
 def test_duplicate_target_fails(tmp_path):
     """目标重名 → 抛 DuplicateTargetError 并中止，未执行任何重命名（不"只改其中一个"）。"""
     a = tmp_path / "a.txt"
@@ -317,7 +314,6 @@ def test_sanitize_applied_in_plan(tmp_path, isolated_config):
     assert (tmp_path / "_con.txt").exists()
 
 
-# ---------------------------------------------------------------- 重命名顺序（sort_by）
 def test_sort_by_mtime_orders_prepared_items(tmp_path, isolated_config):
     """sort_by 配置作用于 prepare 收集顺序（写入临时文件即排序后顺序）。"""
     a = tmp_path / "a.txt"
@@ -362,7 +358,6 @@ def test_sort_reverse_mtime_descending(tmp_path, isolated_config):
     assert [i.name for i in items] == ["b.txt", "a.txt"]
 
 
-# ---------------------------------------------------------------- 预览工具
 def test_preview_rows(tmp_path):
     from onomedit.core.pipeline import preview_rows
 
@@ -399,7 +394,6 @@ def test_levenshtein():
     assert levenshtein("kitten", "sitting") == 3
 
 
-# ---------------------------------------------------------------- 路径去重
 def test_prepare_dedupes_same_path_twice(tmp_path, isolated_config):
     """同一路径显式传入两次：只保留一项，避免同一文件在临时文件出现多行。"""
     paths = _make_files(tmp_path, names=("a.txt",))

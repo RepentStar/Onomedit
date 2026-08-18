@@ -106,7 +106,6 @@ def display_base(paths: list[str]) -> str:
     except ValueError:
         return ""
     if len(paths) == 1:
-        # 单个输入：取目录；目录输入则再向上取一级（显示 b\... 而非完整路径）
         common = os.path.dirname(common)
     return common
 

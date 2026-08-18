@@ -89,7 +89,6 @@ def _run(args: list[str]) -> str | None:
     return proc.stdout if proc.returncode == 0 else None
 
 
-# ---------------------------------------------------------------- Windows
 def _win_setup() -> tuple:
     import ctypes
 

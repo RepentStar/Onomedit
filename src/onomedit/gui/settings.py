@@ -27,7 +27,6 @@ class SettingsWindow(tk.Toplevel):
         body = ttk.Frame(self, padding=10)
         body.pack(fill="both", expand=True)
 
-        # 编辑器
         row = ttk.LabelFrame(body, text="编辑器", padding=8)
         row.pack(fill="x", **pad)
         self._entry("editor", "主编辑器命令", row)
@@ -35,7 +34,6 @@ class SettingsWindow(tk.Toplevel):
         self._entry("editor_timeout", "等待超时（秒）", row)
         self._check("multi_tab", "多标签编辑器（直接轮询等待保存）", row)
 
-        # 重命名
         row2 = ttk.LabelFrame(body, text="重命名", padding=8)
         row2.pack(fill="x", **pad)
         ttk.Label(row2, text="路径类型:").grid(row=0, column=0, sticky="w", pady=2)
@@ -58,7 +56,6 @@ class SettingsWindow(tk.Toplevel):
         self._check("expand_subdirs", "展开子文件夹", row2)
         self._entry("subdirs_depth", "展开层级（1 = 直接子项）", row2)
 
-        # 开关组
         row3 = ttk.LabelFrame(body, text="行为", padding=8)
         row3.pack(fill="x", **pad)
         self._check("open_editor", "打开编辑器", row3)
@@ -68,7 +65,6 @@ class SettingsWindow(tk.Toplevel):
         self._check("skip_confirmation", "跳过重命名确认（编辑保存后直接执行）", row3)
         self._check("exit_after", "完成后退出", row3)
 
-        # 排除
         row4 = ttk.LabelFrame(body, text="排除", padding=8)
         row4.pack(fill="x", **pad)
         for key, label in (
@@ -81,7 +77,6 @@ class SettingsWindow(tk.Toplevel):
         ):
             self._check(f"exclude.{key}", f"排除{label}", row4)
 
-        # 预览与安全
         row5 = ttk.LabelFrame(body, text="预览与安全", padding=8)
         row5.pack(fill="x", **pad)
         self._check("preview.diff", "显示差异", row5)
@@ -94,7 +89,6 @@ class SettingsWindow(tk.Toplevel):
         ttk.Button(btns, text="重置默认", command=self._reset).pack(side="right", padx=4)
         ttk.Button(btns, text="取消", command=self.destroy).pack(side="right", padx=4)
 
-    # ---- 控件辅助 ----
     def _entry(self, key: str, label: str, parent: ttk.Frame) -> None:
         row = len(parent.grid_slaves()) // 2
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", pady=2)
@@ -113,7 +107,6 @@ class SettingsWindow(tk.Toplevel):
         )
         self._vars[dotted] = var
 
-    # ---- 动作 ----
     def _save(self) -> None:
         cfg = self.cfg
         for dotted, var in self._vars.items():

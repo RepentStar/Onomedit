@@ -80,8 +80,6 @@ def test_expand_subdirs_zero_keeps_dir(tmp_path):
     assert len(expanded) == 1 and expanded[0].full == str(tmp_path)
 
 
-# ---------------------------------------------------------------- 去重
-
 def test_dedupe_items_removes_exact_duplicates(tmp_path):
     p = tmp_path / "a.txt"
     p.write_text("x", encoding="utf-8")
@@ -170,7 +168,6 @@ def test_exclude_symlink(tmp_path):
     assert [i.full for i in kept] == [str(target)]
 
 
-# ---------------------------------------------------------------- 重命名顺序（sort_by）
 def test_sort_items_default_keeps_order(tmp_path):
     _make_tree(tmp_path)
     items = [PathItem(str(tmp_path / "sub")), PathItem(str(tmp_path / "a.txt"))]

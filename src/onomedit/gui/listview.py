@@ -90,7 +90,6 @@ class ListWindow(tk.Toplevel):
         # 双击行切换选中（勾选语义）
         tree.bind("<Double-1>", lambda e: self._toggle(e))
 
-    # ---- 显示 ----
     def _display(self, path: str) -> str:
         """相对基准目录显示；不在基准下或跨盘时原样显示。"""
         if not self.base:
@@ -112,7 +111,7 @@ class ListWindow(tk.Toplevel):
             self.on_cancel()
         self.destroy()
 
-    # ---- 勾选逻辑：Treeview 选中态作为勾选 ----
+    # 勾选逻辑：Treeview 无勾选控件，以选中态表示勾选
     def _selected(self) -> list[int]:
         return [int(iid) for iid in self.tree.selection()]
 
@@ -155,5 +154,4 @@ class ListWindow(tk.Toplevel):
         if self.on_done:
             self.on_done(result)
         if not result.failed:
-            # 全部执行成功 → 短暂展示结果后自动关闭
             self.after(800, self.destroy)

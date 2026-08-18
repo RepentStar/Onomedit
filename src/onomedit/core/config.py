@@ -76,7 +76,6 @@ class Config:
     editor_alt: str = ""
     editor_timeout: float = 120.0
     multi_tab: bool = False
-    # 两个独立开关：是否打开编辑器 / 是否应用规则
     open_editor: bool = True
     apply_rules: bool = True
     # 路径类型（四档之一，默认"不带扩展名"）
@@ -85,13 +84,11 @@ class Config:
     sort_by: str = "default"
     # 反转重命名顺序（升序 → 降序；default 下反转收集顺序）
     sort_reverse: bool = False
-    # 环境变量与自动替换
     enable_envvars: bool = True
     enable_auto_rules: bool = True
     # 子文件夹展开（默认开启，层级 10 ≈ 全递归）
     expand_subdirs: bool = True
     subdirs_depth: int = 10
-    # 排除 / 预览 / 安全
     exclude: ExcludeOptions = field(default_factory=ExcludeOptions)
     preview: PreviewOptions = field(default_factory=PreviewOptions)
     safety: SafetyOptions = field(default_factory=SafetyOptions)
@@ -229,15 +226,12 @@ def load_config() -> Config:
         if not isinstance(raw, dict):
             raise ValueError("config root is not an object")
         cfg = from_dict(raw)
-        # 版本迁移
         cfg = migrate(cfg)
-        # editor 为空（旧配置/被清空）：探测并补写
         if not cfg.editor.strip():
             _ensure_default_editor(cfg)
             save_config(cfg)
         return cfg
     except (OSError, ValueError, json.JSONDecodeError):
-        # 损坏回退：备份后写回默认
         try:
             backup = path.with_suffix(".json.bak")
             os.replace(path, backup)

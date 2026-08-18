@@ -26,7 +26,6 @@ def _ensure_utf8() -> None:
             pass
 
 
-# ---------------------------------------------------------------- 构建解析器
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="onomedit",
@@ -45,7 +44,6 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="<子命令>")
     sub.required = True
 
-    # help
     p_help = sub.add_parser("help", help="显示帮助信息（可指定子命令）", add_help=False)
     p_help.add_argument("topic", nargs="?", help="子命令名（如 rename / restore）")
     p_help.set_defaults(handler=_cmd_help)
@@ -95,7 +93,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_reset.set_defaults(handler=_cmd_config_reset)
 
-    # rename
     p_rename = sub.add_parser(
         "rename",
         help="编辑器模式批量重命名",
@@ -158,7 +155,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_rename.set_defaults(handler=_cmd_rename)
 
-    # restore
     p_restore = sub.add_parser(
         "restore",
         help="恢复重命名",
@@ -171,7 +167,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_restore.add_argument("--partial", action="store_true", help="恢复部分（编辑器筛选日志行）")
     p_restore.set_defaults(handler=_cmd_restore)
 
-    # history
     p_history = sub.add_parser(
         "history",
         help="查看重命名日志（最近一次）",
@@ -183,7 +178,6 @@ def build_parser() -> argparse.ArgumentParser:
     p_history.add_argument("--all", action="store_true", help="查看全部历史")
     p_history.set_defaults(handler=_cmd_history)
 
-    # gui
     p_gui = sub.add_parser(
         "gui",
         help="启动图形界面",
@@ -194,7 +188,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_gui.set_defaults(handler=_cmd_gui)
 
-    # version
     p_version = sub.add_parser(
         "version",
         help="版本信息",
@@ -208,7 +201,6 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-# ---------------------------------------------------------------- 子命令实现
 def _cmd_help(args) -> int:
     """显示帮助；可指定子命令（``onomedit help rename``）。"""
     parser = build_parser()
@@ -408,7 +400,6 @@ def _cmd_version(args) -> int:
     return 0
 
 
-# ---------------------------------------------------------------- 入口
 def main(argv: list[str] | None = None) -> int:
     _ensure_utf8()
     args_list = list(sys.argv[1:] if argv is None else argv)

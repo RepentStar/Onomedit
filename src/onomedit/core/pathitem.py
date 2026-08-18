@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import os
 
-# 路径类型（四档）
 PATH_TYPE_FULL = "full"
 PATH_TYPE_NAME = "name"
 PATH_TYPE_STEM = "stem"
@@ -23,7 +22,6 @@ class PathItem:
     def __init__(self, full: str | os.PathLike):
         self.full = os.fspath(full)
 
-    # ---- 四段（惰性属性） ----
     @property
     def directory(self) -> str:
         return os.path.dirname(self.full)
@@ -41,7 +39,6 @@ class PathItem:
         """扩展名（含点，如 ``.txt``；无扩展名为空串）。"""
         return os.path.splitext(self.name)[1]
 
-    # ---- 段级读写 ----
     def get_field(self, scope: str) -> str:
         if scope not in PATH_TYPES:
             raise ValueError(f"未知路径类型: {scope}")

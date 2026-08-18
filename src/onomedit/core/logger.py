@@ -33,7 +33,6 @@ class RenameLogger:
         self.error_path = self.log_dir / "error.log"
         self._session_open = False
 
-    # ---- 会话 ----
     def begin_session(self) -> None:
         """开始一次重命名会话：清空"最近一次"日志。"""
         self.log_dir.mkdir(parents=True, exist_ok=True)
@@ -52,14 +51,12 @@ class RenameLogger:
     def record_error(self, message: str) -> None:
         self._append(self.error_path, message.rstrip("\n") + "\n")
 
-    # ---- 读取 ----
     def read_last(self) -> list[tuple[str, str]]:
         return self._read_pairs(self.last_path)
 
     def read_history(self) -> list[tuple[str, str]]:
         return self._read_pairs(self.history_path)
 
-    # ---- 内部 ----
     def _append(self, path: Path, text: str) -> None:
         try:
             with open(path, "a", encoding="utf-8") as f:
