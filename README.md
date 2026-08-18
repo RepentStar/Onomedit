@@ -43,6 +43,7 @@ uv sync --extra gui --extra dnd  # 或仅 GUI 依赖（界面 + 拖拽）
 onomedit help                       # 帮助（可带子命令：onomedit help rename）
 onomedit config set-editor notepad  # 配置编辑器（首次启动会自动探测，可跳过）
 onomedit rename file1.txt "*.jpg"   # 拉起编辑器 → 修改 → 保存 → 重命名
+onomedit rename "*.jpg" "*.png"     # 多模式并列：同时处理 jpg 与 png（见下方通配符说明）
 onomedit rename folder/             # 目录默认展开子文件夹（层级 10）
 onomedit rename folder/ --depth 2   # 临时只展开到第 2 层（不改配置）
 onomedit rename                     # 缺省读剪贴板中的路径
@@ -52,16 +53,29 @@ onomedit restore                    # 恢复上次重命名
 onomedit gui                        # 启动 GUI；无参数运行默认打开 GUI
 ```
 
+## 路径匹配（glob 通配符）
+
+`rename` 的路径参数支持 shell 风格的 glob 通配符（`*`、`?`、`[abc]` 字符类），且不依赖 shell：Windows（cmd / PowerShell）不会展开通配符，由程序内部自动展开；Unix 系 shell 会先展开，程序同时兼容两种方式（`"*.jpg"` 加引号可强制由程序展开）。
+
+```bash
+onomedit rename "*.jpg"             # 当前目录全部 jpg（* 不跨目录层级）
+onomedit rename "?.jpg"             # ? 匹配单个字符：a.jpg、1.jpg…
+onomedit rename "img[0-9].jpg"      # 字符类：img0.jpg ~ img9.jpg
+onomedit rename "*.jpg" "*.png"     # 多模式并列：jpg 与 png（推荐写法）
+```
+
+注意：**集合 / 逻辑或写法不支持**。`*[jpg,png]` 是单字符类，只会匹配以 `j`/`p`/`g`/`,`/`n` 任一字符结尾的文件（会误匹配）；`*.{jpg,png}` 花括号仅 bash 会展开，程序内不生效，Windows 下会静默匹配为空。需要匹配 jpg 与 png 时请并列写多个模式。
+
 ## 子命令一览
 
-| 子命令            | 说明                                                                                                  |
-| ----------------- | ----------------------------------------------------------------------------------------------------- |
-| `help 【子命令】` | 帮助与示例                                                                                            |
-| `config`          | 查看配置；`config set KEY VALUE`、`config set-editor CMD`、`config reset`                             |
+| 子命令            | 说明                                                                                                                                          |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `help 【子命令】` | 帮助与示例                                                                                                                                    |
+| `config`          | 查看配置；`config set KEY VALUE`、`config set-editor CMD`、`config reset`                                                                     |
 | `rename [PATH]`   | 批量重命名（`--dry-run` / `--no-editor` / `--path-type` / `--sort-by` / `--reverse` / `--depth` / `--multi-tab` / `--timeout` / `--exclude`） |
-| `restore`         | 恢复上次；`--all` 全部历史；`--partial` 编辑器筛选恢复                                                |
-| `history [--all]` | 查看重命名日志                                                                                        |
-| `gui` / `version` | 图形界面 / 版本号                                                                                     |
+| `restore`         | 恢复上次；`--all` 全部历史；`--partial` 编辑器筛选恢复                                                                                        |
+| `history [--all]` | 查看重命名日志                                                                                                                                |
+| `gui` / `version` | 图形界面 / 版本号                                                                                                                             |
 
 ## GUI 用法
 
