@@ -191,3 +191,57 @@ def test_cmd_rename_reverse_overrides_cfg(monkeypatch, isolated_config):
     args = build_parser().parse_args(["rename", "a.txt", "--reverse"])
     cli_mod._cmd_rename(args)
     assert captured["cfg"].sort_reverse is True
+
+
+def test_rename_path_type_parses():
+    args = build_parser().parse_args(["rename", "a.txt", "--path-type", "name"])
+    assert args.path_type == "name"
+
+
+def test_rename_path_type_invalid_rejected():
+    with pytest.raises(SystemExit):
+        build_parser().parse_args(["rename", "a.txt", "--path-type", "zzz"])
+
+
+def test_rename_path_type_absent_none():
+    args = build_parser().parse_args(["rename", "a.txt"])
+    assert args.path_type is None
+
+
+def test_rename_path_type_all_choices_are_valid():
+    args = build_parser().parse_args(
+        ["rename", "a.txt", "--path-type", config_mod.PATH_TYPES[-1]]
+    )
+    assert args.path_type == config_mod.PATH_TYPES[-1]
+
+
+def test_cmd_rename_path_type_overrides_cfg(monkeypatch, isolated_config):
+    """--path-type 临时覆盖配置 path_type（不改配置文件）。"""
+    import onomedit.cli as cli_mod
+
+    captured = {}
+
+    class _Result:
+        success = []
+        failed = []
+        skipped = []
+        total = 0
+
+    class FakeOutcome:
+        dry_run = False
+        result = _Result()
+        pairs = []
+        preview = None
+
+    class FakePipeline:
+        def __init__(self, cfg, **kw):
+            captured["cfg"] = cfg
+
+        def run_editor_mode(self, paths, dry_run=False):
+            captured["paths"] = paths
+            return FakeOutcome()
+
+    monkeypatch.setattr(cli_mod, "RenamePipeline", FakePipeline)
+    args = build_parser().parse_args(["rename", "a.txt", "--path-type", "full"])
+    cli_mod._cmd_rename(args)
+    assert captured["cfg"].path_type == "full"
