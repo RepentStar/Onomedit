@@ -129,6 +129,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_rename.add_argument(
+        "--depth",
+        type=int,
+        metavar="N",
+        help=(
+            "临时目录搜索深度（仅本次生效，覆盖配置 subdirs_depth）："
+            "1 = 直接子项，0 = 不展开；指定时临时开启子文件夹展开"
+        ),
+    )
+    p_rename.add_argument(
         "--exclude",
         nargs="+",
         action="append",
@@ -257,6 +266,10 @@ def _cmd_rename(args) -> int:
         cfg.open_editor = False
     if args.sort_by:
         cfg.sort_by = args.sort_by
+    if args.depth is not None:
+        # 临时深度：覆盖层级并开启展开（用户显式指定深度即隐含要展开）
+        cfg.subdirs_depth = args.depth
+        cfg.expand_subdirs = True
     if args.exclude:
         # 扁平化多组 tag，在现有配置基础上追加（不改配置文件）
         tags = [tag for group in args.exclude for tag in group]

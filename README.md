@@ -44,6 +44,7 @@ onomedit help                       # 帮助（可带子命令：onomedit help r
 onomedit config set-editor notepad  # 配置编辑器（首次启动会自动探测，可跳过）
 onomedit rename file1.txt "*.jpg"   # 拉起编辑器 → 修改 → 保存 → 重命名
 onomedit rename folder/             # 目录默认展开子文件夹（层级 10）
+onomedit rename folder/ --depth 2   # 临时只展开到第 2 层（不改配置）
 onomedit rename                     # 缺省读剪贴板中的路径
 onomedit rename *.txt --dry-run     # 预览（不执行）
 onomedit rename *.txt --exclude h d --dry-run  # 临时排除隐藏文件与目录
@@ -57,7 +58,7 @@ onomedit gui                        # 启动 GUI；无参数运行默认打开 G
 | ----------------- | ----------------------------------------------------------------------------------------------------- |
 | `help 【子命令】` | 帮助与示例                                                                                            |
 | `config`          | 查看配置；`config set KEY VALUE`、`config set-editor CMD`、`config reset`                             |
-| `rename [PATH]`   | 批量重命名（`--dry-run` / `--no-editor` / `--path-type` / `--sort-by` / `--multi-tab` / `--timeout` / `--exclude`） |
+| `rename [PATH]`   | 批量重命名（`--dry-run` / `--no-editor` / `--path-type` / `--sort-by` / `--depth` / `--multi-tab` / `--timeout` / `--exclude`） |
 | `restore`         | 恢复上次；`--all` 全部历史；`--partial` 编辑器筛选恢复                                                |
 | `history [--all]` | 查看重命名日志                                                                                        |
 | `gui` / `version` | 图形界面 / 版本号                                                                                     |
@@ -133,6 +134,18 @@ onomedit config set auto_rules '[{"scope":"stem","kind":"replace","find":"old","
 onomedit config set sort_by mtime          # 持久配置：按修改时间排序
 onomedit rename folder/ --sort-by size     # 临时覆盖：本次按大小排序（不改配置）
 onomedit rename *.jpg --sort-by name --dry-run  # 按名称排序后预览
+```
+
+## 临时目录深度（`--depth`）
+
+`rename` 支持用 `--depth N` 临时指定本次重命名的目录搜索深度，只对本次生效，
+不改配置文件：1 = 直接子项，0 = 不展开；指定时临时开启子文件夹展开
+（即使配置里 `expand_subdirs` 为 `false`）。
+
+```bash
+onomedit rename folder/ --depth 1     # 本次只处理直接子项（临时覆盖 subdirs_depth）
+onomedit rename folder/ --depth 0     # 本次不展开（目录本身作为一项）
+onomedit rename folder/ --depth 3 --sort-by mtime --dry-run  # 组合临时参数
 ```
 
 ## 临时排除（`--exclude`）
