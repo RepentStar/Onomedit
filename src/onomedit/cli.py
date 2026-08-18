@@ -124,7 +124,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=collection.SORT_BY_CHOICES,
         metavar="KEY",
         help=(
-            "临时重命名顺序（仅本次生效，覆盖配置 sort_by）："
+            "临时重命名顺序："
             "default 原顺序、name 名称、path 路径、mtime 修改时间、ctime 创建时间、size 大小"
         ),
     )
@@ -132,7 +132,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--reverse",
         action="store_true",
         help=(
-            "临时反转重命名顺序（仅本次生效，覆盖配置 sort_reverse）："
+            "临时反转重命名顺序："
             "与 --sort-by 组合时按排序键降序，否则反转原顺序"
         ),
     )
@@ -141,7 +141,7 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         metavar="N",
         help=(
-            "临时目录搜索深度（仅本次生效，覆盖配置 subdirs_depth）："
+            "临时目录搜索深度："
             "1 = 直接子项，0 = 不展开；指定时临时开启子文件夹展开"
         ),
     )
