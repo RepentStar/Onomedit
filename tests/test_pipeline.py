@@ -397,3 +397,34 @@ def test_levenshtein():
     assert levenshtein("", "abc") == 3
     assert levenshtein("abc", "abc") == 0
     assert levenshtein("kitten", "sitting") == 3
+
+
+# ---------------------------------------------------------------- 路径去重
+def test_prepare_dedupes_same_path_twice(tmp_path, isolated_config):
+    """同一路径显式传入两次：只保留一项，避免同一文件在临时文件出现多行。"""
+    paths = _make_files(tmp_path, names=("a.txt",))
+    cfg = _cfg(tmp_path, open_editor=False)
+    items, _, _ = RenamePipeline(cfg).prepare([paths[0], paths[0]])
+    assert [i.full for i in items] == [paths[0]]
+
+
+def test_prepare_dedupes_glob_overlap(tmp_path, isolated_config):
+    """多模式重叠：glob 匹配到 a.txt，显式再给 a.txt → 只算一次。"""
+    paths = _make_files(tmp_path)  # a.txt b.txt c.txt
+    cfg = _cfg(tmp_path, open_editor=False)
+    items, _, _ = RenamePipeline(cfg).prepare([str(tmp_path / "*.txt"), paths[0]])
+    assert sorted(i.name for i in items) == ["a.txt", "b.txt", "c.txt"]
+
+
+def test_prepare_dedupes_nested_subdir_expand(tmp_path, isolated_config):
+    """目录 A 与其子目录 A\\sub 同时给出且展开：sub 内文件只出现一次。"""
+    folder = tmp_path / "A"
+    folder.mkdir()
+    (folder / "a.txt").write_text("1", encoding="utf-8")
+    (folder / "sub").mkdir()
+    (folder / "sub" / "b.txt").write_text("2", encoding="utf-8")
+    cfg = _cfg(tmp_path, open_editor=False, expand_subdirs=True, subdirs_depth=3)
+    items, _, _ = RenamePipeline(cfg).prepare([str(folder), str(folder / "sub")])
+    fulls = [i.full for i in items]
+    assert len(fulls) == len(set(fulls))  # 无重复
+    assert fulls.count(str(folder / "sub" / "b.txt")) == 1

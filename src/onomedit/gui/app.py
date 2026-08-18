@@ -193,8 +193,11 @@ class MainWindow:
                 shown.extend(it.full for it in items)
             else:
                 shown.append(p)
+        # 展开结果可能重复（如同时添加目录 A 与其子目录 A\B、或手动添加的文件与目录内容重叠），
+        # 去重后再排序，避免同一路径在列表中（及随后的执行流中）出现两次
+        items = collection.dedupe_items([PathItem(p) for p in shown])
         items = collection.sort_items(
-            [PathItem(p) for p in shown], self.cfg.sort_by, reverse=self.cfg.sort_reverse
+            items, self.cfg.sort_by, reverse=self.cfg.sort_reverse
         )
         for it in items:
             self.listbox.insert("end", it.full)

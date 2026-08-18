@@ -241,6 +241,9 @@ class RenamePipeline:
         if self.cfg.expand_subdirs:
             items = collection.expand_subdirs(items, self.cfg.subdirs_depth)
         items = collection.apply_excludes(items, self.cfg.exclude)
+        # 去重：多 glob 模式重叠、显式传同一路径、嵌套目录展开等均会产生重复项，
+        # 重复项会导致同一文件出现在临时文件多行，重命名时相互冲突。
+        items = collection.dedupe_items(items)
         items = collection.sort_items(
             items, self.cfg.sort_by, reverse=self.cfg.sort_reverse
         )

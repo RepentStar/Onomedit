@@ -50,6 +50,24 @@ def build_items(paths: list[str]) -> list[PathItem]:
     return [PathItem(p) for p in paths]
 
 
+def dedupe_items(items: list[PathItem]) -> list[PathItem]:
+    """按规范化绝对路径去重，保留首次出现的条目。
+
+    Windows 文件系统大小写不敏感，且 ``a.txt`` 与 ``.\\a.txt``、``./A.TXT`` 均
+    指向同一文件，故以 ``normcase(abspath(...))`` 为去重键（POSIX 上 normcase
+    原样返回，大小写不同的文件不会被误合并）。
+    """
+    seen: set[str] = set()
+    out: list[PathItem] = []
+    for item in items:
+        key = os.path.normcase(os.path.abspath(item.full))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
+
 def expand_subdirs(items: list[PathItem], depth: int) -> list[PathItem]:
     """把目录项展开为其（限层级）子内容：depth=1 为直接子项，depth=2 再含下一层；
     depth<=0 不展开；展开后的目录项本身不再保留。"""

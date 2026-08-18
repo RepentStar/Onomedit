@@ -229,7 +229,7 @@ Release 提供两种产物（推送 `v*` 标签由 GitHub Actions 构建，参�
 ## 开发
 
 ```bash
-uv run pytest                             # 单元测试（146 项）
+uv run pytest                             # 单元测试
 uv run python scripts/smoke_test.py       # 核心冒烟
 pwsh scripts/e2e_cli.ps1                  # CLI 端到端（假编辑器）
 uv run python scripts/gui_smoke.py        # GUI 冒烟

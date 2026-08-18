@@ -80,6 +80,45 @@ def test_expand_subdirs_zero_keeps_dir(tmp_path):
     assert len(expanded) == 1 and expanded[0].full == str(tmp_path)
 
 
+# ---------------------------------------------------------------- 去重
+
+def test_dedupe_items_removes_exact_duplicates(tmp_path):
+    p = tmp_path / "a.txt"
+    p.write_text("x", encoding="utf-8")
+    other = tmp_path / "b.txt"
+    other.write_text("y", encoding="utf-8")
+    items = [PathItem(str(p)), PathItem(str(p)), PathItem(str(other))]
+    got = collection.dedupe_items(items)
+    assert [i.full for i in got] == [str(p), str(other)]
+
+
+def test_dedupe_items_case_insensitive(tmp_path):
+    """Windows 大小写不敏感：不同写法的同一路径视为重复（首个保留）。"""
+    p = tmp_path / "A.TXT"
+    p.write_text("x", encoding="utf-8")
+    items = [PathItem(str(p)), PathItem(str(tmp_path / "a.txt"))]
+    got = collection.dedupe_items(items)
+    assert [i.full for i in got] == [str(p)]
+
+
+def test_dedupe_items_relative_alias(tmp_path):
+    """相对/带 . 的路径与绝对路径指向同一文件：视为重复。"""
+    p = tmp_path / "a.txt"
+    p.write_text("x", encoding="utf-8")
+    items = [PathItem(str(p)), PathItem(os.path.join(str(tmp_path), ".", "a.txt"))]
+    got = collection.dedupe_items(items)
+    assert len(got) == 1
+
+
+def test_dedupe_items_keeps_distinct(tmp_path):
+    p1 = tmp_path / "a.txt"
+    p2 = tmp_path / "b.txt"
+    p1.write_text("1", encoding="utf-8")
+    p2.write_text("2", encoding="utf-8")
+    got = collection.dedupe_items([PathItem(str(p1)), PathItem(str(p2))])
+    assert len(got) == 2
+
+
 def test_exclude_files(tmp_path):
     _make_tree(tmp_path)
     items = [PathItem(str(tmp_path / "a.txt")), PathItem(str(tmp_path / "sub"))]
