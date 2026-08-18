@@ -193,7 +193,9 @@ class MainWindow:
                 shown.extend(it.full for it in items)
             else:
                 shown.append(p)
-        items = collection.sort_items([PathItem(p) for p in shown], self.cfg.sort_by)
+        items = collection.sort_items(
+            [PathItem(p) for p in shown], self.cfg.sort_by, reverse=self.cfg.sort_reverse
+        )
         for it in items:
             self.listbox.insert("end", it.full)
 

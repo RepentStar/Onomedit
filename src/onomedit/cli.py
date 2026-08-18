@@ -129,6 +129,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_rename.add_argument(
+        "--reverse",
+        action="store_true",
+        help=(
+            "临时反转重命名顺序（仅本次生效，覆盖配置 sort_reverse）："
+            "与 --sort-by 组合时按排序键降序，否则反转原顺序"
+        ),
+    )
+    p_rename.add_argument(
         "--depth",
         type=int,
         metavar="N",
@@ -266,6 +274,8 @@ def _cmd_rename(args) -> int:
         cfg.open_editor = False
     if args.sort_by:
         cfg.sort_by = args.sort_by
+    if args.reverse:
+        cfg.sort_reverse = True
     if args.depth is not None:
         # 临时深度：覆盖层级并开启展开（用户显式指定深度即隐含要展开）
         cfg.subdirs_depth = args.depth

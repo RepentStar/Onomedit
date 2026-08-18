@@ -10,7 +10,7 @@
 - **编辑器是核心**：拉起并等待编辑器（单实例 / 启动器 / 多标签自动适配），GUI 下焦点自动转到编辑器
 - **两种模式**：CLI（子命令式）与 GUI，编辑内容均由你偏好的编辑器完成
 - **路径类型四档**：全路径 / 文件名 / 不带扩展名 / 扩展名，默认「不带扩展名」
-- **重命名顺序可选**：按名称 / 路径 / 修改时间 / 创建时间 / 大小排序，GUI 与 CLI（`--sort-by`）均可配置
+- **重命名顺序可选**：按名称 / 路径 / 修改时间 / 创建时间 / 大小排序，可反转；GUI 与 CLI（`--sort-by` / `--reverse`）均可配置
 - **环境变量占位符**：`<n>` 递增、`<d>` 日期、`<f>`/`<p>` 目录名、`<t>`/`<tc>` 时间、`<r>`/`<rg>` 随机、`<clip>` 剪贴板
 - **自动替换规则**：替换（三种）/ 转换 / 插入，可带条件
 - **安全优先**：dry-run 预览、非法字符/保留名防护、重名序号、冲突解环、行数校验、目标重名中止（警告且不执行）
@@ -58,7 +58,7 @@ onomedit gui                        # 启动 GUI；无参数运行默认打开 G
 | ----------------- | ----------------------------------------------------------------------------------------------------- |
 | `help 【子命令】` | 帮助与示例                                                                                            |
 | `config`          | 查看配置；`config set KEY VALUE`、`config set-editor CMD`、`config reset`                             |
-| `rename [PATH]`   | 批量重命名（`--dry-run` / `--no-editor` / `--path-type` / `--sort-by` / `--depth` / `--multi-tab` / `--timeout` / `--exclude`） |
+| `rename [PATH]`   | 批量重命名（`--dry-run` / `--no-editor` / `--path-type` / `--sort-by` / `--reverse` / `--depth` / `--multi-tab` / `--timeout` / `--exclude`） |
 | `restore`         | 恢复上次；`--all` 全部历史；`--partial` 编辑器筛选恢复                                                |
 | `history [--all]` | 查看重命名日志                                                                                        |
 | `gui` / `version` | 图形界面 / 版本号                                                                                     |
@@ -130,10 +130,14 @@ onomedit config set auto_rules '[{"scope":"stem","kind":"replace","find":"old","
 | `ctime`   | 创建时间（旧→新）      |
 | `size`    | 文件大小（小→大）      |
 
+反转：配置键 `sort_reverse`（GUI「反转顺序」勾选框；CLI 用 `--reverse` 临时开启）——
+配合排序依据时按排序键降序，单独使用（`default`）时反转收集原顺序。
+
 ```bash
-onomedit config set sort_by mtime          # 持久配置：按修改时间排序
-onomedit rename folder/ --sort-by size     # 临时覆盖：本次按大小排序（不改配置）
-onomedit rename *.jpg --sort-by name --dry-run  # 按名称排序后预览
+onomedit config set sort_by mtime             # 持久配置：按修改时间排序
+onomedit config set sort_reverse true         # 持久反转（修改时间新→旧）
+onomedit rename folder/ --sort-by size        # 临时覆盖：本次按大小排序（不改配置）
+onomedit rename *.jpg --sort-by name --reverse --dry-run  # 按名称降序后预览
 ```
 
 ## 临时目录深度（`--depth`）
@@ -177,6 +181,7 @@ onomedit rename *.txt --exclude f --dry-run  # 排除普通文件，仅预览
 | `editor`                            | 自动探测           | 编辑器命令（Windows: 记事本→VSCode；macOS: TextEdit；Linux: nano→vi→kate） |
 | `path_type`                         | `stem`             | 路径类型                                                                   |
 | `sort_by`                           | `default`          | 重命名顺序（name/path/mtime/ctime/size）                                   |
+| `sort_reverse`                      | `false`            | 反转重命名顺序（配合 sort_by 降序；default 时倒序）                        |
 | `expand_subdirs` / `subdirs_depth`  | `true` / `10`      | 展开子文件夹及层级                                                         |
 | `exclude.*`                         | 符号链接/隐藏/系统 | 排除开关（文件/目录/只读等）                                               |
 | `preview.diff` / `preview.distance` | `false`            | 预览差异标注 / 编辑距离                                                    |

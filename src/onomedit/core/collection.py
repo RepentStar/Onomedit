@@ -93,13 +93,18 @@ def display_base(paths: list[str]) -> str:
     return common
 
 
-def sort_items(items: list[PathItem], sort_by: str = SORT_BY_DEFAULT) -> list[PathItem]:
+def sort_items(
+    items: list[PathItem], sort_by: str = SORT_BY_DEFAULT, reverse: bool = False
+) -> list[PathItem]:
     """按指定项目排序重命名顺序；default 或未知值保持原顺序（不复制列表）。
 
-    名称/路径排序用 ``normcase`` 保证 Windows 上大小写不敏感且结果可预测；
-    时间/大小排序取 stat 值，stat 失败（权限等）时按 0 处理不中断流程。
+    - reverse=True 时：default 下反转原顺序，其余按排序键降序；
+    - 名称/路径排序用 ``normcase`` 保证 Windows 上大小写不敏感且结果可预测；
+      时间/大小排序取 stat 值，stat 失败（权限等）时按 0 处理不中断流程。
     """
     if sort_by == SORT_BY_DEFAULT or sort_by not in SORT_BY_CHOICES:
+        if reverse:
+            return list(reversed(items))
         return items
     if sort_by == SORT_BY_NAME:
         key = lambda i: os.path.normcase(i.name)
@@ -111,7 +116,7 @@ def sort_items(items: list[PathItem], sort_by: str = SORT_BY_DEFAULT) -> list[Pa
         key = lambda i: _stat_attr(i.full, "st_ctime")
     else:  # SORT_BY_SIZE
         key = lambda i: _stat_attr(i.full, "st_size")
-    return sorted(items, key=key)
+    return sorted(items, key=key, reverse=reverse)
 
 
 def _stat_attr(path: str, attr: str):

@@ -54,6 +54,7 @@ class SettingsWindow(tk.Toplevel):
             width=20,
         ).grid(row=1, column=1, sticky="w", pady=2)
         self._vars["sort_by"] = sort_var
+        self._check("sort_reverse", "反转顺序（配合排序依据：降序/倒序）", row2)
         self._check("expand_subdirs", "展开子文件夹", row2)
         self._entry("subdirs_depth", "展开层级（1 = 直接子项）", row2)
 

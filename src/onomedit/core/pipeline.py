@@ -241,7 +241,9 @@ class RenamePipeline:
         if self.cfg.expand_subdirs:
             items = collection.expand_subdirs(items, self.cfg.subdirs_depth)
         items = collection.apply_excludes(items, self.cfg.exclude)
-        items = collection.sort_items(items, self.cfg.sort_by)
+        items = collection.sort_items(
+            items, self.cfg.sort_by, reverse=self.cfg.sort_reverse
+        )
         if not items:
             raise PipelineError("应用排除规则后没有可处理的文件")
 

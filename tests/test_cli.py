@@ -144,3 +144,52 @@ def test_cmd_rename_depth_overrides_cfg(monkeypatch, isolated_config):
     cli_mod._cmd_rename(args)
     assert captured["cfg"].subdirs_depth == 2
     assert captured["cfg"].expand_subdirs is True  # 指定深度隐含展开
+
+
+# ---------------------------------------------------------------- --reverse 反转顺序
+def test_rename_reverse_parses():
+    args = build_parser().parse_args(["rename", "a.txt", "--reverse"])
+    assert args.reverse is True
+
+
+def test_rename_reverse_absent_false():
+    args = build_parser().parse_args(["rename", "a.txt"])
+    assert args.reverse is False
+
+
+def test_rename_reverse_with_sort_by():
+    args = build_parser().parse_args(["rename", "a.txt", "--sort-by", "name", "--reverse"])
+    assert args.sort_by == "name"
+    assert args.reverse is True
+
+
+def test_cmd_rename_reverse_overrides_cfg(monkeypatch, isolated_config):
+    """--reverse 临时开启顺序反转（不改配置文件）。"""
+    import onomedit.cli as cli_mod
+
+    captured = {}
+
+    class _Result:
+        success = []
+        failed = []
+        skipped = []
+        total = 0
+
+    class FakeOutcome:
+        dry_run = False
+        result = _Result()
+        pairs = []
+        preview = None
+
+    class FakePipeline:
+        def __init__(self, cfg, **kw):
+            captured["cfg"] = cfg
+
+        def run_editor_mode(self, paths, dry_run=False):
+            captured["paths"] = paths
+            return FakeOutcome()
+
+    monkeypatch.setattr(cli_mod, "RenamePipeline", FakePipeline)
+    args = build_parser().parse_args(["rename", "a.txt", "--reverse"])
+    cli_mod._cmd_rename(args)
+    assert captured["cfg"].sort_reverse is True

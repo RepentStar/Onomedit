@@ -83,6 +83,8 @@ class Config:
     path_type: str = PATH_TYPE_STEM
     # 重命名顺序（default 原顺序 / name / path / mtime / ctime / size）
     sort_by: str = "default"
+    # 反转重命名顺序（升序 → 降序；default 下反转收集顺序）
+    sort_reverse: bool = False
     # 环境变量与自动替换
     enable_envvars: bool = True
     enable_auto_rules: bool = True

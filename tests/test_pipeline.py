@@ -340,6 +340,28 @@ def test_sort_by_default_keeps_input_order(tmp_path, isolated_config):
     assert [i.name for i in items] == ["a.txt", "b.txt", "c.txt"]
 
 
+def test_sort_reverse_reverses_input_order(tmp_path, isolated_config):
+    """sort_reverse 开启：原顺序反转（default + reverse）。"""
+    paths = _make_files(tmp_path)
+    cfg = _cfg(tmp_path, open_editor=False, sort_reverse=True)
+    items, _, _ = RenamePipeline(cfg).prepare(paths)
+    assert [i.name for i in items] == ["c.txt", "b.txt", "a.txt"]
+
+
+def test_sort_reverse_mtime_descending(tmp_path, isolated_config):
+    """sort_by=mtime + sort_reverse：修改时间新的在前。"""
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    a.write_text("1", encoding="utf-8")
+    b.write_text("2", encoding="utf-8")
+    past = 1_000_000_000
+    os.utime(a, (past, past))
+    os.utime(b, (past + 10, past + 10))
+    cfg = _cfg(tmp_path, open_editor=False, sort_by="mtime", sort_reverse=True)
+    items, _, _ = RenamePipeline(cfg).prepare([str(a), str(b)])
+    assert [i.name for i in items] == ["b.txt", "a.txt"]
+
+
 # ---------------------------------------------------------------- 预览工具
 def test_preview_rows(tmp_path):
     from onomedit.core.pipeline import preview_rows

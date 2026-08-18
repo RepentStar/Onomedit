@@ -187,3 +187,32 @@ def test_sort_items_unknown_key_keeps_order(tmp_path):
     items = [PathItem(str(tmp_path / "b.txt")), PathItem(str(tmp_path / "a.txt"))]
     got = collection.sort_items(items, "bogus")
     assert got is items  # 未知值安全回退原顺序
+
+
+def test_sort_items_default_reverse_reverses_order(tmp_path):
+    """default + reverse：反转收集顺序。"""
+    items = [PathItem(str(tmp_path / "a.txt")), PathItem(str(tmp_path / "b.txt"))]
+    got = collection.sort_items(items, "default", reverse=True)
+    assert [i.name for i in got] == ["b.txt", "a.txt"]
+    assert got is not items  # 反转产生新列表
+
+
+def test_sort_items_reverse_name_descending(tmp_path):
+    (tmp_path / "z.txt").write_text("1", encoding="utf-8")
+    (tmp_path / "A.txt").write_text("2", encoding="utf-8")
+    items = [PathItem(str(tmp_path / "A.txt")), PathItem(str(tmp_path / "z.txt"))]
+    got = collection.sort_items(items, "name", reverse=True)
+    assert [i.name for i in got] == ["z.txt", "A.txt"]  # 降序
+
+
+def test_sort_items_reverse_mtime_descending(tmp_path):
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    a.write_text("1", encoding="utf-8")
+    b.write_text("2", encoding="utf-8")
+    past = 1_000_000_000
+    os.utime(a, (past, past))
+    os.utime(b, (past + 10, past + 10))
+    items = [PathItem(str(a)), PathItem(str(b))]
+    got = collection.sort_items(items, "mtime", reverse=True)
+    assert [i.name for i in got] == ["b.txt", "a.txt"]  # 修改时间新的在前
