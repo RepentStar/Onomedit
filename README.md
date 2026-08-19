@@ -101,28 +101,7 @@ onomedit rename "*.jpg" "*.png"     # 多模式并列：jpg 与 png（推荐写�
 
 示例：把 `img001.jpg` 改为 `IMG-20260812-001.jpg` 等，编辑器中写入 `IMG-<d>yyyyMMdd;-<n>1;3;1;`，保存后自动递增。
 
-## 自动替换规则
-
-配置 `auto_rules`（JSON 列表），作用于四档路径类型，规则顺序固定：
-替换/转换/插入 → 环境变量展开 → 安全命名。
-
-```bash
-onomedit config set auto_rules '[{"scope":"stem","kind":"replace","find":"old","replace":"new"}]'
-```
-
-| 字段                    | 取值                                                                                 |
-| ----------------------- | ------------------------------------------------------------------------------------ |
-| `scope`                 | `full`/`name`/`stem`/`ext`                                                           |
-| `kind`                  | `replace` / `replace_icase` / `regex` / `convert` / `insert` / `env`                 |
-| `find` / `replace`      | 查找串 / 替换为（可含环境变量）                                                      |
-| `convert`               | `upper` / `lower` / `capitalize` / `title` / `fullwidth` / `halfwidth` / `urldecode` |
-| `insert` / `insert_at`  | 插入文本 / 位置（`start`/`end`）                                                     |
-| `condition` / `enabled` | 条件正则（不匹配跳过）/ 是否启用                                                     |
-
-> [!TIP]
-> 此功能不推荐使用，建议使用编辑器中的搜索替换，使用熟悉的编辑器中的可视化操作更简单易懂。如果有自动化替换需求可以使用编辑器的宏功能，大多数高级编辑器都有，例如 Vim
-
-## 路径类型（编辑范围）
+## 路径类型（编辑范围 `--path-type`）
 
 编辑范围 = 临时文件中每行显示并供编辑的内容。配置键 `path_type`（默认 `stem`，GUI 设置窗口「路径类型」下拉框）；CLI 用 `--path-type TYPE` 临时覆盖，只对本次重命名生效，不改配置文件：
 
@@ -162,7 +141,7 @@ onomedit rename folder/ --sort-by size        # 临时覆盖：本次按大小�
 onomedit rename *.jpg --sort-by name --reverse --dry-run  # 按名称降序后预览
 ```
 
-## 临时目录深度（`--depth`）
+## 目录深度（`--depth`）
 
 `rename` 支持用 `--depth N` 临时指定本次重命名的目录搜索深度，只对本次生效，
 不改配置文件：1 = 直接子项，0 = 不展开；指定时临时开启子文件夹展开
@@ -174,7 +153,7 @@ onomedit rename folder/ --depth 0     # 本次不展开（目录本身作为一�
 onomedit rename folder/ --depth 3 --sort-by mtime --dry-run  # 组合临时参数
 ```
 
-## 临时排除（`--exclude`）
+## 类型排除（`--exclude`）
 
 `rename` 支持用 `--exclude TYPE…` 临时排除路径类型，只对本次重命名生效，
 不改配置文件；未列出的类型沿用现有配置 `exclude.*` 的取值（默认排除符号链接/隐藏/系统）。
@@ -191,6 +170,27 @@ onomedit rename *.jpg --exclude d        # 排除目录（子文件夹展开后�
 onomedit rename folder/ --exclude h s    # 排除隐藏与系统文件
 onomedit rename *.txt --exclude f --dry-run  # 排除普通文件，仅预览
 ```
+
+## 自动替换规则
+
+配置 `auto_rules`（JSON 列表），作用于四档路径类型，规则顺序固定：
+替换/转换/插入 → 环境变量展开 → 安全命名。
+
+```bash
+onomedit config set auto_rules '[{"scope":"stem","kind":"replace","find":"old","replace":"new"}]'
+```
+
+| 字段                    | 取值                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------ |
+| `scope`                 | `full`/`name`/`stem`/`ext`                                                           |
+| `kind`                  | `replace` / `replace_icase` / `regex` / `convert` / `insert` / `env`                 |
+| `find` / `replace`      | 查找串 / 替换为（可含环境变量）                                                      |
+| `convert`               | `upper` / `lower` / `capitalize` / `title` / `fullwidth` / `halfwidth` / `urldecode` |
+| `insert` / `insert_at`  | 插入文本 / 位置（`start`/`end`）                                                     |
+| `condition` / `enabled` | 条件正则（不匹配跳过）/ 是否启用                                                     |
+
+> [!TIP]
+> 此功能不推荐使用，建议使用编辑器中的搜索替换，使用熟悉的编辑器中的可视化操作更简单易懂。如果有自动化替换需求可以使用编辑器的宏功能，大多数高级编辑器都有，例如 Vim
 
 ## 配置
 
