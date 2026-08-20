@@ -193,6 +193,111 @@ def test_cmd_rename_reverse_overrides_cfg(monkeypatch, isolated_config):
     assert captured["cfg"].sort_reverse is True
 
 
+def test_cmd_rename_stdin_non_tty_reads_stream(monkeypatch, isolated_config):
+    """未提供路径且 stdin 来自管道时，从 stdin 读取路径（优先于剪贴板）。"""
+    import onomedit.cli as cli_mod
+    from onomedit.core import collection
+
+    captured = {}
+
+    class _Result:
+        success = []
+        failed = []
+        skipped = []
+        total = 0
+
+    class FakeOutcome:
+        dry_run = False
+        result = _Result()
+        pairs = []
+        preview = None
+
+    class FakePipeline:
+        def __init__(self, cfg, **kw):
+            pass
+
+        def run_editor_mode(self, paths, dry_run=False):
+            captured["paths"] = paths
+            return FakeOutcome()
+
+    class FakeStdin:
+        def isatty(self):
+            return False  # 模拟管道重定向（非终端）
+
+    monkeypatch.setattr(cli_mod, "RenamePipeline", FakePipeline)
+    monkeypatch.setattr(cli_mod.sys, "stdin", FakeStdin())
+    monkeypatch.setattr(collection, "read_stream_paths", lambda stream=None: ["pipe1.txt", "pipe2.txt"])
+    args = build_parser().parse_args(["rename"])
+    cli_mod._cmd_rename(args)
+    assert captured["paths"] == ["pipe1.txt", "pipe2.txt"]
+
+
+def test_cmd_rename_tty_without_paths_keeps_empty(monkeypatch, isolated_config):
+    """stdin 为终端且未提供路径时，不读管道（原逻辑：走剪贴板）。"""
+    import onomedit.cli as cli_mod
+
+    captured = {}
+
+    class _Result:
+        success = []
+        failed = []
+        skipped = []
+        total = 0
+
+    class FakeOutcome:
+        dry_run = False
+        result = _Result()
+        pairs = []
+        preview = None
+
+    class FakePipeline:
+        def __init__(self, cfg, **kw):
+            pass
+
+        def run_editor_mode(self, paths, dry_run=False):
+            captured["paths"] = paths
+            return FakeOutcome()
+
+    class FakeStdin:
+        def isatty(self):
+            return True  # 终端：不读管道
+
+    monkeypatch.setattr(cli_mod, "RenamePipeline", FakePipeline)
+    monkeypatch.setattr(cli_mod.sys, "stdin", FakeStdin())
+    args = build_parser().parse_args(["rename"])
+    cli_mod._cmd_rename(args)
+    assert captured["paths"] == []  # 保持原逻辑（读剪贴板）
+
+
+def test_cmd_rename_stdin_empty_pipe_aborts(monkeypatch, isolated_config):
+    """空管道：报错且不回退剪贴板（不调用 pipeline）。"""
+    import onomedit.cli as cli_mod
+    from onomedit.core import collection
+
+    called = {"run": False}
+
+    class FakePipeline:
+        def __init__(self, cfg, **kw):
+            pass
+
+        def run_editor_mode(self, paths, dry_run=False):
+            called["run"] = True
+            raise AssertionError("空管道不应进入 pipeline")
+
+    class FakeStdin:
+        def isatty(self):
+            return False
+
+    monkeypatch.setattr(cli_mod, "RenamePipeline", FakePipeline)
+    monkeypatch.setattr(cli_mod.sys, "stdin", FakeStdin())
+    monkeypatch.setattr(collection, "read_stream_paths", lambda stream=None: [])
+
+    args = build_parser().parse_args(["rename"])
+    code = cli_mod._cmd_rename(args)
+    assert code == 1
+    assert called["run"] is False
+
+
 def test_rename_path_type_parses():
     args = build_parser().parse_args(["rename", "a.txt", "--path-type", "name"])
     assert args.path_type == "name"
@@ -245,3 +350,23 @@ def test_cmd_rename_path_type_overrides_cfg(monkeypatch, isolated_config):
     args = build_parser().parse_args(["rename", "a.txt", "--path-type", "full"])
     cli_mod._cmd_rename(args)
     assert captured["cfg"].path_type == "full"
+
+
+def test_pipe_hint_windows_mentions_powershell(monkeypatch):
+    """Windows 平台提示给出 PowerShell 语法，并提醒对象渲染成表格的坑。"""
+    import onomedit.cli as cli_mod
+
+    monkeypatch.setattr(cli_mod.os, "name", "nt")
+    hint = cli_mod._pipe_hint()
+    assert "Get-ChildItem" in hint and "cd" in hint
+    assert "表头" in hint  # 仅 Windows 有对象渲染问题
+
+
+def test_pipe_hint_posix_mentions_bash(monkeypatch):
+    """POSIX 平台提示给出 bash/zsh 语法（find/cd），不含 PowerShell 表格提醒。"""
+    import onomedit.cli as cli_mod
+
+    monkeypatch.setattr(cli_mod.os, "name", "posix")
+    hint = cli_mod._pipe_hint()
+    assert "find" in hint and "cd /some/dir" in hint
+    assert "Get-ChildItem" not in hint  # POSIX 无 PowerShell 表格问题

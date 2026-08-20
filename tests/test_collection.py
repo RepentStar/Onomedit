@@ -10,6 +10,27 @@ from onomedit.core.config import ExcludeOptions
 from onomedit.core.pathitem import PathItem
 
 
+class _Stream:
+    """模拟管道 stdout（delimiter 分隔）：含 Windows CRLF 与空行。"""
+    def __init__(self, content):
+        self._data = iter(content.split("\n"))
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self._data)
+
+
+def test_read_stream_paths_strips_and_skips_empty():
+    stream = _Stream(" a.txt\n\nb.txt \r\nc.txt\n")
+    assert collection.read_stream_paths(stream) == ["a.txt", "b.txt", "c.txt"]
+
+
+def test_read_stream_paths_empty():
+    assert collection.read_stream_paths(_Stream("\n\n")) == []
+
+
 def _make_tree(root):
     (root / "a.txt").write_text("1", encoding="utf-8")
     (root / "sub").mkdir()

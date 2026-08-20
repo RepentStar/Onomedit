@@ -98,19 +98,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="编辑器模式批量重命名",
         description=(
             "把文件名列表写入临时文件并拉起编辑器；用户修改保存后读回并批量重命名。\n"
-            "路径可含通配符；不提供路径时从剪贴板读取。"
+            "路径可含通配符；不提供路径时从剪贴板读取；若 stdin 来自管道则读其行作路径。"
         ),
         epilog=(
             "示例:\n"
             "  onomedit rename a.txt b.txt\n"
             "  onomedit rename *.jpg --dry-run\n"
             "  onomedit rename --no-editor --path-type name  仅应用规则不拉起编辑器\n"
-            "  onomedit rename *.txt --exclude h d --dry-run  临时排除隐藏文件与目录"
+            "  onomedit rename *.txt --exclude h d --dry-run  临时排除隐藏文件与目录\n"
+            "  dir /b *.jpg | onomedit rename  从管道读入路径（编辑模式下重命名）"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         add_help=False,
     )
-    p_rename.add_argument("paths", nargs="*", help="文件/目录路径（可含通配符）；缺省读剪贴板")
+    p_rename.add_argument("paths", nargs="*", help="文件/目录路径（可含通配符）；缺省读剪贴板或 stdin 管道")
     p_rename.add_argument("--dry-run", action="store_true", help="仅预览（差异/距离），不执行")
     p_rename.add_argument("--no-editor", action="store_true", help="跳过编辑器（直接应用规则）")
     p_rename.add_argument("--path-type", choices=config_mod.PATH_TYPES, help="覆盖路径类型")
@@ -254,6 +255,28 @@ def _cmd_config_reset(args) -> int:
     return 0
 
 
+def _pipe_hint() -> str:
+    """管道场景路径解析失败时的跨平台提示（Windows vs POSIX 语法各异）。
+
+    根因跨 shell 一致：管道里的相对路径按当前工作目录查找，程序无法从裸文件名
+    推断其所在目录。POSIX 的 `ls` 管道输出本就干净（每行一个裸名），无表格问题；
+    Windows PowerShell 直接传文件对象会被渲染成带表头的表格，额外提醒。
+    """
+    if os.name == "nt":
+        return (
+            "\n提示: 管道里的路径解析失败——相对路径会按当前目录查找。\n"
+            "  · 提供完整路径：Get-ChildItem C:\\dir | ForEach-Object FullName | onomedit rename …\n"
+            "  · 或先 cd 到目标目录：cd C:\\dir; Get-ChildItem -Name | onomedit rename …\n"
+            "  · 直接用 Get-ChildItem C:\\dir | onomedit（不加参数）会把文件对象渲染成带表头表格，无法解析"
+        )
+    return (
+        "\n提示: 管道里的路径解析失败——相对路径会按当前目录查找，程序无法从裸文件名推断其目录。\n"
+        "  · 提供完整路径(逐行进管道)：find /some/dir -maxdepth 1 | onomedit rename …\n"
+        "    (需要仅文件可加 -type f；find 输出以 /some/dir 开头的完整路径，可直接解析)\n"
+        "  · 或先 cd 到目标目录：cd /some/dir; ls | onomedit rename …"
+    )
+
+
 def _cmd_rename(args) -> int:
     cfg = config_mod.load_config()
     if args.path_type:
@@ -278,10 +301,24 @@ def _cmd_rename(args) -> int:
         cfg.exclude = config_mod.merge_exclude_tags(cfg.exclude, tags)
 
     pipeline = RenamePipeline(cfg, on_status=lambda msg: print(msg, flush=True))
+
+    # 未提供路径且 stdin 来自管道时，把管道输出当作路径列表（优先于剪贴板）
+    raw_paths = args.paths
+    from_pipe = False
+    if not raw_paths and not sys.stdin.isatty():
+        from_pipe = True
+        raw_paths = collection.read_stream_paths()
+        if not raw_paths:
+            # 空管道：明确无输入，不回退剪贴板（避免管道场景误读剪贴板）
+            print("错误: 管道未提供任何路径", file=sys.stderr)
+            return 1
     try:
-        outcome = pipeline.run_editor_mode(args.paths, dry_run=args.dry_run)
+        outcome = pipeline.run_editor_mode(raw_paths, dry_run=args.dry_run)
     except PipelineError as e:
         print(f"错误: {e}", file=sys.stderr)
+        if from_pipe:
+            # 管道路径解析失败：补一道管场景特有的可操作提示（按平台给出语法）
+            print(_pipe_hint(), file=sys.stderr)
         return 1
     except tempfile_mgr.LineCountError as e:
         print(f"错误: {e}", file=sys.stderr)

@@ -16,6 +16,7 @@
 - **安全优先**：dry-run 预览、非法字符/保留名防护、重名序号、冲突解环、行数校验、目标重名中止（警告且不执行）
 - **日志与恢复**：一键恢复上次 / 全部 / 部分
 - **剪贴板收集**：资源管理器复制文件/文件夹（CF_HDROP）或文本路径均可作为输入
+- **stdin 读入**：未提供路径且 stdin 来自管道时，逐行读取其输出作路径（`ls | onomedit rename ...`），优先于剪贴板
 - **开箱即用**：首次启动自动探测默认编辑器；无参数运行默认打开 GUI
 
 ## 安装
@@ -47,6 +48,7 @@ onomedit rename "*.jpg" "*.png"     # 多模式并列：同时处理 jpg 与 png
 onomedit rename folder/             # 目录默认展开子文件夹（层级 10）
 onomedit rename folder/ --depth 2   # 临时只展开到第 2 层（不改配置）
 onomedit rename                     # 缺省读剪贴板中的路径
+ls | onomedit rename --no-editor --path-type name  # 从管道读入路径
 onomedit rename *.txt --dry-run     # 预览（不执行）
 onomedit rename *.txt --exclude h d --dry-run  # 临时排除隐藏文件与目录
 onomedit restore                    # 恢复上次重命名
@@ -65,6 +67,45 @@ onomedit rename "*.jpg" "*.png"     # 多模式并列：jpg 与 png（推荐写�
 ```
 
 注意：**集合 / 逻辑或写法不支持**。`*[jpg,png]` 是单字符类，只会匹配以 `j`/`p`/`g`/`,`/`n` 任一字符结尾的文件（会误匹配）；`*.{jpg,png}` 花括号仅 bash 会展开，程序内不生效，Windows 下会静默匹配为空。需要匹配 jpg 与 png 时请并列写多个模式。
+
+## 管道读入（stdin）
+
+未提供路径参数且 stdin 来自管道时，程序逐行把管道输出当作待重命名路径（优先于剪贴板）。
+管道里的路径会按当前工作目录解析：**提供完整路径**，或先 `cd` 到文件所在目录再传裸文件名。
+若管道传入的是裸文件名且当前目录下找不到，会提示这一限制（程序无法从裸文件名推断其所在目录）。
+
+**Windows（pwsh）**：
+
+```powershell
+# 完整路径（跨目录安全）
+Get-ChildItem C:\dir -FullName | onomedit rename --no-editor --path-type name
+Get-ChildItem C:\dir | ForEach-Object FullName | onomedit rename --no-editor
+
+# 先切到目标目录再传裸文件名
+Set-Location C:\dir
+Get-ChildItem -Name *.jpg | onomedit rename --no-editor
+```
+
+> [!TIP]
+> **PowerShell**：直接 `Get-ChildItem C:\APP | onomedit`（不加 `-Name` / `-FullName`）会把文件对象渲染成
+> 带 `Directory:` 表头的表格文本而非干净的逐路径行，程序无法解析。请在管道端用 `-FullName`
+> （或 `ForEach-Object FullName`）输出完整路径。
+
+**Unix（bash / zsh）**：
+
+```bash
+# 完整路径（逐行进管道）：find 输出以目标目录开头的完整路径，可直接解析
+find /some/dir -maxdepth 1 | onomedit rename --no-editor --path-type stem
+#   （需要仅文件时加 -type f）
+
+# 先 cd 到目标目录再传裸文件名（POSIX ls 管道输出本就干净，每行一个裸名）
+cd /some/dir
+ls | onomedit rename --no-editor
+```
+
+> [!TIP]
+> POSIX 的 `ls` 一旦重定向到管道就输出逐行裸文件名，
+> 但裸文件名仍无目录信息——务必 `cd` 到目标目录，或用 `find` 输出完整路径。
 
 ## 子命令一览
 

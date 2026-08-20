@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import glob
 import os
+import sys
 
 from onomedit.core.pathitem import PathItem
 from onomedit.utils import clipboard as clipboard_util
@@ -24,6 +25,16 @@ SORT_BY_CHOICES: tuple[str, ...] = (
     SORT_BY_CTIME,
     SORT_BY_SIZE,
 )
+
+
+def read_stream_paths(stream=None) -> list[str]:
+    """从 stdin 逐行读取路径（管道输入），清洗空白并跳过空行。
+
+    配合 shell 管道：``dir /b | onomedit rename`` 之类把外部命令输出直接当作
+    待重命名路径列表。相对路径按进程当前工作目录解析（与 glob 一致）。
+    """
+    stream = stream if stream is not None else sys.stdin
+    return [line.strip() for line in stream if line.strip()]
 
 
 def collect_paths(raw_paths: list[str] | None, *, use_clipboard: bool = True) -> list[str]:
