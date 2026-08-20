@@ -1,6 +1,6 @@
 """CLI：子命令分发（先于位置参数解析）+ 各子命令实现。
 
-子命令：config / rename / restore / history / gui / version / help。"""
+子命令：config / rename / restore / history / gui / version / help / completion。"""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import sys
 
 from onomedit import __version__
 from onomedit.core import collection, config as config_mod
-from onomedit.core import editor, tempfile_mgr
+from onomedit.core import completion, editor, tempfile_mgr
 from onomedit.core.logger import SEPARATOR, RenameLogger
 from onomedit.core.pipeline import PipelineError, RenamePipeline, restore
 
@@ -198,6 +198,24 @@ def build_parser() -> argparse.ArgumentParser:
         add_help=False,
     )
     p_version.set_defaults(handler=_cmd_version)
+
+    p_comp = sub.add_parser(
+        "completion",
+        help="生成 shell 补全脚本（pipe 到文件后配置）",
+        description=(
+            "输出指定 shell 的补全脚本到 stdout；把 stdout 重定向到文件后配置到 shell。\n"
+            f"支持: {', '.join(completion.supported_shells())}。"
+        ),
+        epilog=completion.completion_usage(),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        add_help=False,
+    )
+    p_comp.add_argument(
+        "shell",
+        choices=completion.supported_shells(),
+        help="目标 shell（bash / zsh / pwsh / fish）",
+    )
+    p_comp.set_defaults(handler=_cmd_completion)
 
     return parser
 
@@ -434,6 +452,18 @@ def _cmd_gui(args) -> int:
 
 def _cmd_version(args) -> int:
     print(f"onomedit {__version__}")
+    return 0
+
+
+def _cmd_completion(args) -> int:
+    """把指定 shell 的补全脚本写到 stdout，供用户重定向到文件。
+
+    用 buffer 二进制写以保证行尾恒为 LF：Windows 文本模式下 \n 会被转成
+    CRLF，破坏 bash/zsh 脚本解析。
+    """
+    data = completion.completion_for(args.shell).encode("utf-8")
+    sys.stdout.buffer.write(data)
+    sys.stdout.buffer.flush()
     return 0
 
 

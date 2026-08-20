@@ -109,14 +109,42 @@ ls | onomedit rename --no-editor
 
 ## 子命令一览
 
-| 子命令            | 说明                                                                                                                                          |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `help 【子命令】` | 帮助与示例                                                                                                                                    |
-| `config`          | 查看配置；`config set KEY VALUE`、`config set-editor CMD`、`config reset`                                                                     |
-| `rename [PATH]`   | 批量重命名（`--dry-run` / `--no-editor` / `--path-type` / `--sort-by` / `--reverse` / `--depth` / `--multi-tab` / `--timeout` / `--exclude`） |
-| `restore`         | 恢复上次；`--all` 全部历史；`--partial` 编辑器筛选恢复                                                                                        |
-| `history [--all]` | 查看重命名日志                                                                                                                                |
-| `gui` / `version` | 图形界面 / 版本号                                                                                                                             |
+| 子命令             | 说明                                                                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `help 【子命令】`  | 帮助与示例                                                                                                                                    |
+| `config`           | 查看配置；`config set KEY VALUE`、`config set-editor CMD`、`config reset`                                                                     |
+| `rename [PATH]`    | 批量重命名（`--dry-run` / `--no-editor` / `--path-type` / `--sort-by` / `--reverse` / `--depth` / `--multi-tab` / `--timeout` / `--exclude`） |
+| `restore`          | 恢复上次；`--all` 全部历史；`--partial` 编辑器筛选恢复                                                                                        |
+| `history [--all]`  | 查看重命名日志                                                                                                                                |
+| `gui` / `version`  | 图形界面 / 版本号                                                                                                                             |
+| `completion SHELL` | 输出 shell 补全脚本到 stdout（pipe 到文件后配置；`bash` / `zsh` / `pwsh` / `fish` / `psc`）                                                   |
+
+## Shell 补全
+
+`onomedit completion SHELL` 把补全脚本打印到 stdout，重定向到文件后配置到你常用的 shell（当前支持 `bash` / `zsh` / `pwsh` / `fish` / `psc`）：
+
+```bash
+# bash：保存后 source，或放入 bash-completion 的自动加载目录
+onomedit completion bash > ~/.local/share/bash-completion/completions/onomedit
+source ~/.local/share/bash-completion/completions/onomedit
+
+# zsh：放入 fpath，确保 ~/.zfunc 在 fpath 且已 compinit
+mkdir -p ~/.zfunc
+onomedit completion zsh > ~/.zfunc/_onomedit
+
+# PowerShell (pwsh)：写入 $PROFILE 并重载
+onomedit completion pwsh > "$HOME\Documents\PowerShell\onomedit.ps1"
+. "$HOME\Documents\PowerShell\onomedit.ps1" # 此行记得写入 $PROFILE
+
+# fish：放到补全自动加载目录
+onomedit completion fish > ~/.config/fish/completions/onomedit.fish
+
+# PSCompletions：候选带中文 tip 提示（自定义补全器，配合 PSCompletions 模块）
+onomedit completion psc  > "$HOME\Documents\PowerShell\onomedit.psc.ps1"
+. "$HOME\Documents\PowerShell\onomedit.psc.ps1" # 此行记得写入 $PROFILE
+```
+
+补全覆盖全部子命令与常用选项（含 `--path-type` / `--sort-by` / `--exclude` 的取值）。
 
 ## GUI 用法
 
