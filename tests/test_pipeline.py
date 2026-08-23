@@ -305,6 +305,34 @@ def test_chain_solved(tmp_path):
     assert (tmp_path / "c.txt").read_text(encoding="utf-8") == "b"
 
 
+def test_cycle_logs_only_user_visible_renames(tmp_path):
+    """循环改名的恢复日志不应泄露内部临时文件名。"""
+    a = tmp_path / "a.txt"
+    b = tmp_path / "b.txt"
+    a.write_text("AAA", encoding="utf-8")
+    b.write_text("BBB", encoding="utf-8")
+    log_dir = tmp_path / "log"
+    log = RenameLogger(log_dir)
+    log.begin_session()
+
+    Renamer(log=log).run([(str(a), str(b)), (str(b), str(a))])
+
+    assert log.read_last() == [(str(a), str(b)), (str(b), str(a))]
+    assert "__onomedit_tmp_" not in log.last_path.read_text(encoding="utf-8")
+
+
+def test_rename_creates_missing_target_parent(tmp_path):
+    """全路径模式移动到新目录时自动创建目标父目录。"""
+    source = tmp_path / "a.txt"
+    target = tmp_path / "new" / "nested" / "b.txt"
+    source.write_text("content", encoding="utf-8")
+
+    result = Renamer().run([(str(source), str(target))])
+
+    assert result.failed == []
+    assert target.read_text(encoding="utf-8") == "content"
+
+
 def test_sanitize_applied_in_plan(tmp_path, isolated_config):
     paths = _make_files(tmp_path)
     cfg = _cfg(tmp_path, open_editor=False, auto_rules=[Rule(scope="stem", kind="replace", find="a", replace="con")])

@@ -29,6 +29,7 @@ def test_reserved_names():
 
 def test_empty_name_passthrough():
     assert sanitize_name("") == ""
+    assert sanitize_name("...") == "_"
 
 
 def test_unique_path_no_conflict(tmp_path):

@@ -7,7 +7,7 @@ import os
 import shutil
 import sys
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 from onomedit.core.pathitem import PATH_TYPES, PATH_TYPE_EXT, PATH_TYPE_FULL, PATH_TYPE_NAME, PATH_TYPE_STEM  # noqa: F401
@@ -169,28 +169,25 @@ def _ensure_default_editor(cfg: Config) -> None:
             cfg.editor = detected
 
 
-def _rule_default() -> list:
-    return []
-
-
 def to_dict(cfg: Config) -> dict:
     """Config → 可 JSON 序列化的 dict。"""
     data = {}
-    for f in cfg.__dataclass_fields__:  # type: ignore[attr-defined]
-        value = getattr(cfg, f)
+    for config_field in fields(cfg):
+        name = config_field.name
+        value = getattr(cfg, name)
         if isinstance(value, (ExcludeOptions, PreviewOptions, SafetyOptions)):
-            data[f] = value.__dict__.copy()
-        elif f == "auto_rules":
-            data[f] = [rule_to_dict(r) for r in value]
+            data[name] = value.__dict__.copy()
+        elif name == "auto_rules":
+            data[name] = [rule_to_dict(r) for r in value]
         else:
-            data[f] = value
+            data[name] = value
     return data
 
 
 def from_dict(data: dict) -> Config:
     """dict → Config，缺失键用默认值填充；未知键忽略。"""
     base = default_config()
-    flat = {f: getattr(base, f) for f in base.__dataclass_fields__}  # type: ignore[attr-defined]
+    flat = {config_field.name: getattr(base, config_field.name) for config_field in fields(base)}
     flat.update({k: v for k, v in data.items() if k in flat})
     for key in ("exclude", "preview", "safety"):
         sub = flat.get(key)

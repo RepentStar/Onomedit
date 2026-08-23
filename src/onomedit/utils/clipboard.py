@@ -151,7 +151,7 @@ def _win_get_hdrop() -> list[str] | None:
     """
     import ctypes
 
-    user32, _kernel32, shell32, void_p = _win_setup()
+    user32, _kernel32, shell32, _void_p = _win_setup()
     if not user32.IsClipboardFormatAvailable(CF_HDROP):
         return None
     if not user32.OpenClipboard(None):

@@ -9,7 +9,7 @@ from pathlib import Path
 
 from onomedit.core import collection, config as config_mod, editor, envvars, rules, tempfile_mgr
 from onomedit.core.logger import RenameLogger, parse_line
-from onomedit.core.pathitem import PathItem
+from onomedit.core.pathitem import PathItem, rename_ensure_parent
 from onomedit.utils import safename
 
 
@@ -131,8 +131,8 @@ class Renamer:
         self.log = log
         self.result = RenameResult()
         self._pending: dict[str, str] = {}
-        self._removed: set[str] = set()  # 已被移走的路径（主循环跳过）
-        self._moved: dict[str, str] = {}  # 临时名 → 最终目标（第二阶段落位）
+        self._removed: set[str] = set()
+        self._moved: dict[str, tuple[str, str]] = {}
         self._tmp_seq = 0
 
     def run(self, pairs: list[tuple[str, str]]) -> RenameResult:
@@ -150,16 +150,16 @@ class Renamer:
             self._do(old, new)
 
         # 第二阶段：被移走的内容落位到最终目标
-        for tmp, target in list(self._moved.items()):
+        for tmp, (old, target) in list(self._moved.items()):
             try:
                 if os.path.exists(target):
                     target = str(safename.unique_path(Path(target)))
-                os.rename(tmp, target)
-                self.result.success.append((tmp, target))
-                self._log_record(tmp, target)
+                rename_ensure_parent(tmp, target)
+                self.result.success.append((old, target))
+                self._log_record(old, target)
             except OSError as e:
-                self.result.failed.append((tmp, target, str(e)))
-                self._log_error(f"{tmp} -> {target}: {e}")
+                self.result.failed.append((old, target, str(e)))
+                self._log_error(f"{old} -> {target}: {e}")
         return self.result
 
     def _do(self, old: str, new: str) -> None:
@@ -171,14 +171,13 @@ class Renamer:
             if os.path.exists(new) and new in self._pending:
                 # 链/环：new 是本批次尚未执行的源 → 先把内容移出到临时名
                 tmp = self._temp_name(new)
-                os.rename(new, tmp)
-                self._log_record(new, tmp)
+                rename_ensure_parent(new, tmp)
                 self._removed.add(new)
-                self._moved[tmp] = self._pending.pop(new)
+                self._moved[tmp] = (new, self._pending.pop(new))
             if os.path.exists(new):
                 # 真冲突：目标仍被占用且不属于本批次 → 安全序号化
                 new = str(safename.unique_path(Path(new)))
-            os.rename(old, new)
+            rename_ensure_parent(old, new)
             self._pending.pop(old, None)
             self.result.success.append((old, new))
             self._log_record(old, new)
@@ -188,12 +187,15 @@ class Renamer:
             self._log_error(f"{old} -> {new}: {e}")
 
     def _temp_name(self, target: str) -> str:
-        self._tmp_seq += 1
         parent = os.path.dirname(target)
         stem, ext = os.path.splitext(os.path.basename(target))
-        return os.path.join(
-            parent, f".__onomedit_tmp_{os.getpid()}_{self._tmp_seq}_{stem}{ext}"
-        )
+        while True:
+            self._tmp_seq += 1
+            candidate = os.path.join(
+                parent, f".__onomedit_tmp_{os.getpid()}_{self._tmp_seq}_{stem}{ext}"
+            )
+            if not os.path.lexists(candidate):
+                return candidate
 
     def _log_record(self, old: str, new: str) -> None:
         if self.log:

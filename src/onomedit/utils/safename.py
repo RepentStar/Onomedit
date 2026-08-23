@@ -34,6 +34,8 @@ def sanitize_name(name: str, *, replace: str = "_") -> str:
     name = _ILLEGAL_CHARS.sub(replace, name)
     name = name.strip()
     name = name.rstrip(". ")
+    if not name:
+        return replace
     stem, dot, ext = name.partition(".")
     if stem.upper() in WINDOWS_RESERVED:
         name = "_" + stem + dot + ext
