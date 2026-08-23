@@ -10,6 +10,7 @@ htmlcov/
 # 构建产物
 dist/
 build/
+target/
 *.egg-info/
 
 # 运行时状态（Codewhale / 本地工具）

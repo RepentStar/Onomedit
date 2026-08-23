@@ -1,0 +1,36 @@
+[workspace]
+members = [
+    "crates/onomedit-core",
+    "crates/onomedit-platform",
+    "apps/onomedit",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.6"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+authors = ["RepentStar <repent@repent.top>"]
+repository = "https://github.com/RepentStar/Onomedit"
+
+[workspace.dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+clap = { version = "4.5", features = ["derive"] }
+eframe = { version = "0.32", default-features = false, features = ["default_fonts", "glow", "wayland", "x11"] }
+fancy-regex = "0.16"
+glob = "0.3"
+rand = "0.9"
+rfd = "0.15"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tempfile = "3"
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
+walkdir = "2"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+

@@ -1,0 +1,29 @@
+{
+  "safe_names": [
+    {"input": "a<b>:c\"d/e\\f|g?h*i.txt", "expected": "a_b__c_d_e_f_g_h_i.txt"},
+    {"input": "  name... ", "expected": "name"},
+    {"input": "CON.txt", "expected": "_CON.txt"},
+    {"input": "...", "expected": "_"},
+    {"input": "中文 文件.txt", "expected": "中文 文件.txt"}
+  ],
+  "paths": [
+    {"input": "C:/x/y/report.tar.gz", "name": "report.tar.gz", "stem": "report.tar", "ext": ".gz"},
+    {"input": "/home/u/.gitignore", "name": ".gitignore", "stem": ".gitignore", "ext": ""},
+    {"input": "plain", "name": "plain", "stem": "plain", "ext": ""}
+  ],
+  "transforms": [
+    {"kind": "upper", "input": "Abc 中文", "expected": "ABC 中文"},
+    {"kind": "lower", "input": "AbC 中文", "expected": "abc 中文"},
+    {"kind": "capitalize", "input": "hello WORLD", "expected": "Hello WORLD"},
+    {"kind": "title", "input": "hello world", "expected": "Hello World"},
+    {"kind": "fullwidth", "input": "A 1!", "expected": "Ａ　１！"},
+    {"kind": "halfwidth", "input": "Ａ　１！", "expected": "A 1!"},
+    {"kind": "urldecode", "input": "%E4%B8%AD%E6%96%87%20x", "expected": "中文 x"}
+  ],
+  "distances": [
+    {"left": "", "right": "abc", "expected": 3},
+    {"left": "abc", "right": "abc", "expected": 0},
+    {"left": "kitten", "right": "sitting", "expected": 3},
+    {"left": "中文", "right": "中问", "expected": 1}
+  ]
+}
