@@ -1,0 +1,42 @@
+[project]
+name = "onomedit"
+version = "0.1.6"
+description = "结合外部编辑器进行批量文件重命名的工具（CLI + GUI）"
+readme = "README.md"
+authors = [
+    { name = "RepentStar", email = "repent@repent.top" }
+]
+requires-python = ">=3.11"
+# 核心功能零依赖：仅标准库即可运行
+dependencies = []
+
+[project.optional-dependencies]
+# GUI：三窗口界面
+gui = [
+    "ttkbootstrap>=1.10",
+]
+# Windows 专属：Shell 扩展属性读取
+win = ["pywin32>=306"]
+# 可选：图片尺寸信息
+img = ["Pillow>=10.0"]
+# 可选：文件拖拽
+dnd = ["tkinterdnd2>=0.4"]
+
+[project.scripts]
+onomedit = "onomedit.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.8,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[dependency-groups]
+dev = [
+    "nuitka>=4.1.3",
+    "ordered-set>=4.1.0",
+    "pytest>=9.1.1",
+    "zstandard>=0.25.0",
+]
