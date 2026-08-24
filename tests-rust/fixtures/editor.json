@@ -1,4 +1,11 @@
 {
+  "split_cases": [
+    {
+      "name": "quoted_executable_and_argument",
+      "command": "\"editor tools/fake editor\" --label \"two words\"",
+      "expected": ["editor tools/fake editor", "--label", "two words"]
+    }
+  ],
   "launch_cases": [
     {
       "name": "single_process_saves_before_exit",
@@ -7,6 +14,17 @@
       "multi_tab": false,
       "timeout_ms": 1500,
       "expected_changed": true,
+      "expected_status_contains": []
+    },
+    {
+      "name": "quoted_argument_is_passed_without_quotes",
+      "mode": "set",
+      "args": ["1", "renamed value"],
+      "initial": "line1\n",
+      "multi_tab": false,
+      "timeout_ms": 1500,
+      "expected_changed": true,
+      "expected_content": "renamed value\n",
       "expected_status_contains": []
     },
     {
@@ -67,6 +85,27 @@
       "expected_changed": true,
       "expected_content": "one\n",
       "expected_status_contains": []
+    }
+  ],
+  "windows_launch_cases": [
+    {
+      "name": "quoted_cmd_path_with_spaces",
+      "extension": "cmd",
+      "lookup": "direct",
+      "executable": "fake editor"
+    },
+    {
+      "name": "quoted_bat_path_with_spaces",
+      "extension": "bat",
+      "lookup": "direct",
+      "executable": "fake editor bat"
+    },
+    {
+      "name": "pathext_resolves_cmd_from_path",
+      "extension": "cmd",
+      "lookup": "path",
+      "executable": "fixture_editor",
+      "pathext": ".CMD;.BAT"
     }
   ]
 }

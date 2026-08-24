@@ -1,4 +1,10 @@
 use std::env;
+#[cfg(windows)]
+use std::ffi::{OsStr, OsString};
+#[cfg(windows)]
+use std::os::windows::ffi::{OsStrExt, OsStringExt};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::thread;
@@ -136,22 +142,70 @@ fn poll_save(
 }
 
 fn spawn(executable: &Path, arguments: &[String], edit_path: &Path) -> std::io::Result<Child> {
-    if cfg!(windows)
-        && executable
-            .extension()
-            .is_some_and(|ext| ext.eq_ignore_ascii_case("cmd") || ext.eq_ignore_ascii_case("bat"))
+    #[cfg(windows)]
+    if executable
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("cmd") || ext.eq_ignore_ascii_case("bat"))
     {
-        Command::new("cmd")
-            .arg("/C")
-            .arg(executable)
-            .args(arguments)
-            .arg(edit_path)
-            .spawn()
-    } else {
-        Command::new(executable)
-            .args(arguments)
-            .arg(edit_path)
-            .spawn()
+        return Command::new("cmd")
+            .args(["/D", "/S", "/C"])
+            .raw_arg(windows_batch_command_line(executable, arguments, edit_path))
+            .spawn();
+    }
+    Command::new(executable)
+        .args(arguments)
+        .arg(edit_path)
+        .spawn()
+}
+
+#[cfg(windows)]
+fn windows_batch_command_line(
+    executable: &Path,
+    arguments: &[String],
+    edit_path: &Path,
+) -> OsString {
+    let mut command = vec![b'"' as u16];
+    let values = std::iter::once(executable.as_os_str())
+        .chain(arguments.iter().map(OsStr::new))
+        .chain(std::iter::once(edit_path.as_os_str()));
+    for (index, value) in values.enumerate() {
+        if index > 0 {
+            command.push(b' ' as u16);
+        }
+        push_windows_argument(&mut command, value);
+    }
+    command.push(b'"' as u16);
+    OsString::from_wide(&command)
+}
+
+#[cfg(windows)]
+fn push_windows_argument(command: &mut Vec<u16>, value: &OsStr) {
+    let value: Vec<u16> = value.encode_wide().collect();
+    let quoted = value.is_empty() || value.iter().any(|ch| matches!(*ch, 0x20 | 0x09));
+    if quoted {
+        command.push(b'"' as u16);
+    }
+
+    let mut backslashes = 0;
+    for ch in value {
+        if ch == b'\\' as u16 {
+            backslashes += 1;
+        } else if ch == b'"' as u16 {
+            command.extend(std::iter::repeat_n(b'\\' as u16, backslashes * 2 + 1));
+            command.push(ch);
+            backslashes = 0;
+        } else {
+            command.extend(std::iter::repeat_n(b'\\' as u16, backslashes));
+            command.push(ch);
+            backslashes = 0;
+        }
+    }
+    command.extend(std::iter::repeat_n(
+        b'\\' as u16,
+        backslashes * if quoted { 2 } else { 1 },
+    ));
+    if quoted {
+        command.push(b'"' as u16);
     }
 }
 
