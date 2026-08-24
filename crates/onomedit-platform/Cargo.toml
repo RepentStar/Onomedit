@@ -9,3 +9,7 @@ license.workspace = true
 onomedit-core = { path = "../onomedit-core" }
 thiserror.workspace = true
 
+[dev-dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true

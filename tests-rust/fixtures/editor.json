@@ -1,0 +1,72 @@
+{
+  "launch_cases": [
+    {
+      "name": "single_process_saves_before_exit",
+      "mode": "save",
+      "initial": "line1\n",
+      "multi_tab": false,
+      "timeout_ms": 1500,
+      "expected_changed": true,
+      "expected_status_contains": []
+    },
+    {
+      "name": "launcher_exit_switches_to_save_polling",
+      "mode": "launcher-delay",
+      "args": ["0.2"],
+      "initial": "line1\n",
+      "multi_tab": false,
+      "timeout_ms": 1500,
+      "expected_changed": true,
+      "expected_status_contains": ["启动器"]
+    },
+    {
+      "name": "launcher_poll_timeout_continues",
+      "mode": "launcher",
+      "initial": "line1\n",
+      "multi_tab": false,
+      "timeout_ms": 350,
+      "expected_changed": false,
+      "expected_status_contains": ["启动器", "等待保存超时"]
+    },
+    {
+      "name": "multi_tab_waits_for_save_not_process_exit",
+      "mode": "delay",
+      "args": ["0.2"],
+      "initial": "line1\n",
+      "multi_tab": true,
+      "timeout_ms": 1500,
+      "expected_changed": true,
+      "expected_status_contains": ["多标签模式"]
+    },
+    {
+      "name": "multi_tab_timeout_continues",
+      "mode": "launcher",
+      "initial": "line1\n",
+      "multi_tab": true,
+      "timeout_ms": 350,
+      "expected_changed": false,
+      "expected_status_contains": ["多标签模式", "等待保存超时"]
+    },
+    {
+      "name": "long_running_process_timeout_continues",
+      "mode": "sleep",
+      "args": ["0.8"],
+      "initial": "line1\n",
+      "multi_tab": false,
+      "timeout_ms": 250,
+      "expected_changed": false,
+      "expected_status_contains": ["等待编辑器超时"]
+    },
+    {
+      "name": "truncate_is_observed_as_a_save",
+      "mode": "truncate",
+      "args": ["1"],
+      "initial": "one\ntwo\n",
+      "multi_tab": false,
+      "timeout_ms": 1500,
+      "expected_changed": true,
+      "expected_content": "one\n",
+      "expected_status_contains": []
+    }
+  ]
+}

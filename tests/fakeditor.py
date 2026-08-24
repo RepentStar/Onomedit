@@ -3,12 +3,14 @@
 用法：``python fakeditor.py <模式> [参数...] <临时文件>``
 
 模式：exit 立即退出不改文件（模拟启动器型/用户未改关闭）；save 末尾追加一行退出；
-set 把第 N 行替换为指定内容；delay 休眠指定秒后追加退出；
-truncate 只保留前 N 行（模拟用户删行）；launcher 立即退出（配合外部线程延迟修改，测试轮询等待）。
+set 把第 N 行替换为指定内容；delay 休眠指定秒后追加退出；sleep 仅休眠；
+truncate 只保留前 N 行（模拟用户删行）；launcher 立即退出；
+launcher-delay 启动一个稍后保存的后台进程后立即退出。
 """
 
 import json
 import os
+import subprocess
 import sys
 import time
 
@@ -54,6 +56,18 @@ def main() -> int:
         time.sleep(float(args[0]) if args else 0.5)
         with open(path, "a", encoding="utf-8") as f:
             f.write("\nsaved")
+    elif mode == "launcher-delay":
+        # 模拟启动器把文件交给另一个进程后立即退出；后台进程稍后保存。
+        delay = args[0] if args else "0.5"
+        subprocess.Popen(
+            [sys.executable, __file__, "delay", delay, path],
+            close_fds=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    elif mode == "sleep":
+        # 保持进程存活但不保存，用于主进程等待超时场景。
+        time.sleep(float(args[0]) if args else 1.0)
     elif mode == "truncate":
         # 只保留前 N 行（模拟用户删行，用于行数校验失败测试）
         keep = int(args[0]) if args else 1
