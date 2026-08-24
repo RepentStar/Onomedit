@@ -1,5 +1,7 @@
-use std::fs;
+use std::fs::{self, FileTimes};
 use std::path::{Component, Path, PathBuf};
+use std::thread;
+use std::time::{Duration, UNIX_EPOCH};
 
 use onomedit_core::config;
 use onomedit_core::edit_file::EditFileError;
@@ -17,12 +19,25 @@ struct Fixture {
 struct Tree {
     directories: Vec<String>,
     files: Vec<TreeFile>,
+    #[serde(default)]
+    symlinks: Vec<TreeSymlink>,
 }
 
 #[derive(Debug, Deserialize)]
 struct TreeFile {
     path: String,
     content: String,
+    #[serde(default)]
+    attributes: Vec<String>,
+    mtime: Option<u64>,
+    delay_before_ms: Option<u64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TreeSymlink {
+    path: String,
+    target: String,
+    kind: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -34,6 +49,10 @@ struct Case {
     expected: Option<Expected>,
     expected_windows: Option<Expected>,
     expected_error: Option<String>,
+    #[serde(default)]
+    requires_symlinks: bool,
+    #[serde(default)]
+    requires_readonly_enforcement: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,15 +74,118 @@ fn fixture() -> Fixture {
     serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap()
 }
 
-fn build_tree(root: &Path, tree: &Tree) {
+#[cfg(windows)]
+fn set_windows_attributes(path: &Path, attributes: &[String]) {
+    use std::iter;
+    use std::os::windows::ffi::OsStrExt;
+
+    unsafe extern "system" {
+        fn SetFileAttributesW(file_name: *const u16, file_attributes: u32) -> i32;
+    }
+
+    let value = attributes.iter().fold(0, |value, attribute| {
+        value
+            | match attribute.as_str() {
+                "readonly" => 0x1,
+                "hidden" => 0x2,
+                "system" => 0x4,
+                _ => 0,
+            }
+    });
+    let wide: Vec<u16> = path
+        .as_os_str()
+        .encode_wide()
+        .chain(iter::once(0))
+        .collect();
+    // SAFETY: wide is NUL-terminated and remains alive throughout the call.
+    assert_ne!(
+        unsafe { SetFileAttributesW(wide.as_ptr(), if value == 0 { 0x80 } else { value }) },
+        0
+    );
+}
+
+#[cfg(not(windows))]
+fn set_windows_attributes(_path: &Path, _attributes: &[String]) {}
+
+fn create_symlink(target: &Path, path: &Path, kind: &str) -> std::io::Result<()> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::{symlink_dir, symlink_file};
+        if kind == "dir" {
+            symlink_dir(target, path)
+        } else {
+            symlink_file(target, path)
+        }
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::symlink;
+        let _ = kind;
+        symlink(target, path)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (target, path, kind);
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "symlinks are unsupported on this platform",
+        ))
+    }
+}
+
+#[cfg(windows)]
+fn readonly_is_enforced(path: &Path) -> bool {
+    fs::metadata(path).is_ok_and(|metadata| metadata.permissions().readonly())
+}
+
+#[cfg(not(windows))]
+fn readonly_is_enforced(path: &Path) -> bool {
+    fs::OpenOptions::new().write(true).open(path).is_err()
+}
+
+fn build_tree(root: &Path, tree: &Tree) -> bool {
     fs::create_dir(root).unwrap();
     for relative in &tree.directories {
         fs::create_dir_all(root.join(relative)).unwrap();
     }
     for file in &tree.files {
+        if let Some(delay) = file.delay_before_ms {
+            thread::sleep(Duration::from_millis(delay));
+        }
         let path = root.join(&file.path);
         fs::create_dir_all(path.parent().unwrap()).unwrap();
-        fs::write(path, &file.content).unwrap();
+        fs::write(&path, &file.content).unwrap();
+        if let Some(mtime) = file.mtime {
+            let file = fs::File::options().write(true).open(&path).unwrap();
+            file.set_times(FileTimes::new().set_modified(UNIX_EPOCH + Duration::from_secs(mtime)))
+                .unwrap();
+        }
+        if file.attributes.iter().any(|value| value == "readonly") && !cfg!(windows) {
+            let mut permissions = fs::metadata(&path).unwrap().permissions();
+            permissions.set_readonly(true);
+            fs::set_permissions(&path, permissions).unwrap();
+        }
+        set_windows_attributes(&path, &file.attributes);
+    }
+    let mut ready = true;
+    for link in &tree.symlinks {
+        if create_symlink(&root.join(&link.target), &root.join(&link.path), &link.kind).is_err() {
+            ready = false;
+            break;
+        }
+    }
+    ready
+}
+
+#[cfg(windows)]
+struct AttributeCleanup(Vec<PathBuf>);
+
+#[cfg(windows)]
+impl Drop for AttributeCleanup {
+    fn drop(&mut self) {
+        for path in &self.0 {
+            set_windows_attributes(path, &[]);
+        }
     }
 }
 
@@ -86,7 +208,30 @@ fn shared_filesystem_prepare_and_plan_cases_match() {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path().join("tree");
         let scratch = directory.path().join("scratch");
-        build_tree(&root, &fixture.tree);
+        let symlinks_ready = build_tree(&root, &fixture.tree);
+        #[cfg(windows)]
+        let _attribute_cleanup = AttributeCleanup(
+            fixture
+                .tree
+                .files
+                .iter()
+                .filter(|file| !file.attributes.is_empty())
+                .map(|file| root.join(&file.path))
+                .collect(),
+        );
+        if case.requires_symlinks && !symlinks_ready {
+            eprintln!("{} skipped: symlink creation is unavailable", case.name);
+            continue;
+        }
+        if case.requires_readonly_enforcement
+            && !readonly_is_enforced(&root.join("attributes/readonly.txt"))
+        {
+            eprintln!(
+                "{} skipped: read-only permissions are not enforced",
+                case.name
+            );
+            continue;
+        }
         fs::create_dir(&scratch).unwrap();
 
         let mut cfg = config::from_value(case.config).unwrap();

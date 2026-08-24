@@ -5,7 +5,10 @@
       "album/sub",
       "album/sub/deep",
       "empty",
-      ".hidden-dir"
+      ".hidden-dir",
+      "links",
+      "attributes",
+      "timestamps"
     ],
     "files": [
       {"path": "a.TXT", "content": "A"},
@@ -15,7 +18,19 @@
       {"path": "album/first 01.txt", "content": "first"},
       {"path": "album/sub/second.txt", "content": "second"},
       {"path": "album/sub/deep/third.txt", "content": "third"},
-      {"path": ".hidden-dir/secret.txt", "content": "secret"}
+      {"path": ".hidden-dir/secret.txt", "content": "secret"},
+      {"path": "attributes/visible.txt", "content": "visible"},
+      {"path": "attributes/hidden.txt", "content": "hidden", "attributes": ["hidden"]},
+      {"path": "attributes/system.txt", "content": "system", "attributes": ["system"]},
+      {"path": "attributes/readonly.txt", "content": "readonly", "attributes": ["readonly"]},
+      {"path": "timestamps/mtime-old.txt", "content": "old", "mtime": 946684800},
+      {"path": "timestamps/mtime-new.txt", "content": "new", "mtime": 946684900},
+      {"path": "timestamps/ctime-old.txt", "content": "old"},
+      {"path": "timestamps/ctime-new.txt", "content": "new", "delay_before_ms": 30}
+    ],
+    "symlinks": [
+      {"path": "links/file-link.txt", "target": "a.TXT", "kind": "file"},
+      {"path": "links/dir-link", "target": "album/sub", "kind": "dir"}
     ]
   },
   "cases": [
@@ -138,12 +153,15 @@
         "exclude": {"files": true, "hidden": false}
       },
       "expected": {
-        "items": [".hidden-dir", "album", "empty"],
-        "edit_lines": [".hidden-dir", "album", "empty"],
+        "items": [".hidden-dir", "album", "attributes", "empty", "links", "timestamps"],
+        "edit_lines": [".hidden-dir", "album", "attributes", "empty", "links", "timestamps"],
         "pairs": [
           {"old": ".hidden-dir", "new": ".hidden-dir"},
           {"old": "album", "new": "album"},
-          {"old": "empty", "new": "empty"}
+          {"old": "attributes", "new": "attributes"},
+          {"old": "empty", "new": "empty"},
+          {"old": "links", "new": "links"},
+          {"old": "timestamps", "new": "timestamps"}
         ]
       }
     },
@@ -197,6 +215,141 @@
       },
       "edited_lines": ["only-one-line"],
       "expected_error": "line_count"
+    },
+    {
+      "name": "directory_symlink_is_listed_but_not_followed",
+      "requires_symlinks": true,
+      "inputs": ["links"],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": true,
+        "subdirs_depth": 2,
+        "sort_by": "path",
+        "path_type": "name",
+        "apply_rules": false,
+        "exclude": {"hidden": false, "symlinks": false}
+      },
+      "expected": {
+        "items": ["links/dir-link", "links/file-link.txt"],
+        "edit_lines": ["dir-link", "file-link.txt"],
+        "pairs": [
+          {"old": "links/dir-link", "new": "links/dir-link"},
+          {"old": "links/file-link.txt", "new": "links/file-link.txt"}
+        ]
+      }
+    },
+    {
+      "name": "symlink_exclusion_filters_file_and_directory_links",
+      "requires_symlinks": true,
+      "inputs": ["links/dir-link", "links/file-link.txt"],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": false,
+        "exclude": {"hidden": false, "symlinks": true}
+      },
+      "expected_error": "no_files_after_exclude"
+    },
+    {
+      "name": "platform_file_attributes_are_excluded",
+      "requires_readonly_enforcement": true,
+      "inputs": [
+        "attributes/visible.txt",
+        "attributes/hidden.txt",
+        "attributes/system.txt",
+        "attributes/readonly.txt"
+      ],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": false,
+        "sort_by": "name",
+        "path_type": "name",
+        "apply_rules": false,
+        "exclude": {"readonly": true, "hidden": true, "system": true}
+      },
+      "expected": {
+        "items": ["attributes/hidden.txt", "attributes/system.txt", "attributes/visible.txt"],
+        "edit_lines": ["hidden.txt", "system.txt", "visible.txt"],
+        "pairs": [
+          {"old": "attributes/hidden.txt", "new": "attributes/hidden.txt"},
+          {"old": "attributes/system.txt", "new": "attributes/system.txt"},
+          {"old": "attributes/visible.txt", "new": "attributes/visible.txt"}
+        ]
+      },
+      "expected_windows": {
+        "items": ["attributes/visible.txt"],
+        "edit_lines": ["visible.txt"],
+        "pairs": [
+          {"old": "attributes/visible.txt", "new": "attributes/visible.txt"}
+        ]
+      }
+    },
+    {
+      "name": "hidden_names_follow_platform_semantics",
+      "inputs": [".hidden.txt", "attributes/hidden.txt", "attributes/visible.txt"],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": false,
+        "sort_by": "name",
+        "path_type": "name",
+        "apply_rules": false,
+        "exclude": {"hidden": true, "system": false}
+      },
+      "expected": {
+        "items": ["attributes/hidden.txt", "attributes/visible.txt"],
+        "edit_lines": ["hidden.txt", "visible.txt"],
+        "pairs": [
+          {"old": "attributes/hidden.txt", "new": "attributes/hidden.txt"},
+          {"old": "attributes/visible.txt", "new": "attributes/visible.txt"}
+        ]
+      },
+      "expected_windows": {
+        "items": [".hidden.txt", "attributes/visible.txt"],
+        "edit_lines": [".hidden.txt", "visible.txt"],
+        "pairs": [
+          {"old": ".hidden.txt", "new": ".hidden.txt"},
+          {"old": "attributes/visible.txt", "new": "attributes/visible.txt"}
+        ]
+      }
+    },
+    {
+      "name": "mtime_sort_uses_fixed_metadata",
+      "inputs": ["timestamps/mtime-new.txt", "timestamps/mtime-old.txt"],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": false,
+        "sort_by": "mtime",
+        "path_type": "name",
+        "apply_rules": false,
+        "exclude": {"hidden": false, "system": false}
+      },
+      "expected": {
+        "items": ["timestamps/mtime-old.txt", "timestamps/mtime-new.txt"],
+        "edit_lines": ["mtime-old.txt", "mtime-new.txt"],
+        "pairs": [
+          {"old": "timestamps/mtime-old.txt", "new": "timestamps/mtime-old.txt"},
+          {"old": "timestamps/mtime-new.txt", "new": "timestamps/mtime-new.txt"}
+        ]
+      }
+    },
+    {
+      "name": "ctime_sort_uses_platform_stat_semantics",
+      "inputs": ["timestamps/ctime-new.txt", "timestamps/ctime-old.txt"],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": false,
+        "sort_by": "ctime",
+        "path_type": "name",
+        "apply_rules": false,
+        "exclude": {"hidden": false, "system": false}
+      },
+      "expected": {
+        "items": ["timestamps/ctime-old.txt", "timestamps/ctime-new.txt"],
+        "edit_lines": ["ctime-old.txt", "ctime-new.txt"],
+        "pairs": [
+          {"old": "timestamps/ctime-old.txt", "new": "timestamps/ctime-old.txt"},
+          {"old": "timestamps/ctime-new.txt", "new": "timestamps/ctime-new.txt"}
+        ]
+      }
     }
   ]
 }

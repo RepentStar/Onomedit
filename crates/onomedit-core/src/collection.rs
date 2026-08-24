@@ -149,8 +149,8 @@ fn compare(left: &PathItem, right: &PathItem, sort_by: &str) -> Ordering {
     match sort_by {
         "name" => string_key(&left.name()).cmp(&string_key(&right.name())),
         "path" => path_key(left.full()).cmp(&path_key(right.full())),
-        "mtime" => metadata_time(left.full(), true).cmp(&metadata_time(right.full(), true)),
-        "ctime" => metadata_time(left.full(), false).cmp(&metadata_time(right.full(), false)),
+        "mtime" => metadata_time(left.full(), true).total_cmp(&metadata_time(right.full(), true)),
+        "ctime" => metadata_time(left.full(), false).total_cmp(&metadata_time(right.full(), false)),
         "size" => metadata_size(left.full()).cmp(&metadata_size(right.full())),
         _ => Ordering::Equal,
     }
@@ -164,17 +164,46 @@ fn string_key(value: &str) -> String {
     }
 }
 
-fn metadata_time(path: &Path, modified: bool) -> std::time::SystemTime {
-    fs::metadata(path)
-        .ok()
-        .and_then(|metadata| {
-            if modified {
-                metadata.modified().ok()
-            } else {
-                metadata.created().ok()
-            }
-        })
-        .unwrap_or(std::time::UNIX_EPOCH)
+fn metadata_time(path: &Path, modified: bool) -> f64 {
+    let Ok(metadata) = fs::metadata(path) else {
+        return 0.0;
+    };
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        let (seconds, nanoseconds) = if modified {
+            (metadata.mtime(), metadata.mtime_nsec())
+        } else {
+            (metadata.ctime(), metadata.ctime_nsec())
+        };
+        seconds as f64 + nanoseconds as f64 / 1_000_000_000.0
+    }
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        const WINDOWS_TO_UNIX_EPOCH_TICKS: i128 = 116_444_736_000_000_000;
+        let ticks = if modified {
+            metadata.last_write_time()
+        } else {
+            metadata.creation_time()
+        };
+        (i128::from(ticks) - WINDOWS_TO_UNIX_EPOCH_TICKS) as f64 / 10_000_000.0
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        use std::time::UNIX_EPOCH;
+        let time = if modified {
+            metadata.modified()
+        } else {
+            metadata.created()
+        };
+        time.ok()
+            .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+            .map_or(0.0, |duration| duration.as_secs_f64())
+    }
 }
 
 fn metadata_size(path: &Path) -> u64 {
@@ -226,6 +255,23 @@ fn attributes(path: &Path) -> u32 {
         .unwrap_or(0)
 }
 
+#[cfg(windows)]
+fn is_readonly(path: &Path) -> bool {
+    fs::metadata(path).is_ok_and(|metadata| metadata.permissions().readonly())
+}
+
+#[cfg(unix)]
+fn is_readonly(path: &Path) -> bool {
+    use std::ffi::CString;
+    use std::os::unix::ffi::OsStrExt;
+
+    CString::new(path.as_os_str().as_bytes()).is_ok_and(|path| {
+        // SAFETY: CString guarantees a valid NUL-terminated pointer for the duration of the call.
+        unsafe { libc::access(path.as_ptr(), libc::W_OK) != 0 }
+    })
+}
+
+#[cfg(not(any(unix, windows)))]
 fn is_readonly(path: &Path) -> bool {
     fs::metadata(path).is_ok_and(|metadata| metadata.permissions().readonly())
 }
