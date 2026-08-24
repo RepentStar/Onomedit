@@ -38,7 +38,16 @@ def split_command(cmd: str) -> list[str]:
     if not cmd.strip():
         raise EditorError("编辑器命令为空，请先配置（config set-editor / config set editor）")
     if os.name == "nt":
-        return shlex.split(cmd, posix=False)
+        # shlex 的非 POSIX 模式会保留每个 token 的外层引号；传给
+        # CreateProcess 的参数列表前必须去掉，否则带空格的路径无法解析，
+        # 普通参数也会收到本不属于参数内容的引号。
+        args = shlex.split(cmd, posix=False)
+        return [
+            arg[1:-1]
+            if len(arg) >= 2 and arg[0] == arg[-1] and arg[0] in {'"', "'"}
+            else arg
+            for arg in args
+        ]
     return shlex.split(cmd)
 
 

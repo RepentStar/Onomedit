@@ -51,6 +51,34 @@ def test_batch_file_editor_launches(tmp_path):
     assert tempfile_mgr.changed(sig, tempfile_mgr.signature(p))
 
 
+def test_quoted_editor_argument_is_passed_without_quotes(tmp_path):
+    p = _write(tmp_path)
+    sig = tempfile_mgr.signature(p)
+
+    editor.launch_and_wait(
+        fake_editor_cmd("set", "1", "renamed value"), p, sig, timeout=5
+    )
+
+    assert p.read_text(encoding="utf-8") == "renamed value\n"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows 专属：带空格的编辑器路径")
+def test_quoted_batch_editor_path_with_spaces_launches(tmp_path):
+    p = _write(tmp_path)
+    sig = tempfile_mgr.signature(p)
+    tools_dir = tmp_path / "editor tools"
+    tools_dir.mkdir()
+    batch = tools_dir / "fake editor.cmd"
+    batch.write_text(
+        "@echo off\r\necho saved>> %1\r\n",
+        encoding="utf-8",
+    )
+
+    editor.launch_and_wait(f'"{batch}"', p, sig, timeout=5)
+
+    assert tempfile_mgr.changed(sig, tempfile_mgr.signature(p))
+
+
 def test_save_editor_exits_after_modify(tmp_path):
     """单实例型：编辑器修改文件后退出 → 正常继续。"""
     p = _write(tmp_path)
