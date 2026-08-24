@@ -1,0 +1,202 @@
+{
+  "tree": {
+    "directories": [
+      "album",
+      "album/sub",
+      "album/sub/deep",
+      "empty",
+      ".hidden-dir"
+    ],
+    "files": [
+      {"path": "a.TXT", "content": "A"},
+      {"path": "b.txt", "content": "BB"},
+      {"path": "c.md", "content": "CCC"},
+      {"path": ".hidden.txt", "content": "hidden"},
+      {"path": "album/first 01.txt", "content": "first"},
+      {"path": "album/sub/second.txt", "content": "second"},
+      {"path": "album/sub/deep/third.txt", "content": "third"},
+      {"path": ".hidden-dir/secret.txt", "content": "secret"}
+    ]
+  },
+  "cases": [
+    {
+      "name": "glob_filters_missing_dedupes_and_sorts",
+      "inputs": ["b.txt", "*.txt", "missing.txt", "b.txt"],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": false,
+        "sort_by": "name",
+        "path_type": "name"
+      },
+      "expected": {
+        "items": ["b.txt"],
+        "edit_lines": ["b.txt"],
+        "pairs": [{"old": "b.txt", "new": "b.txt"}]
+      },
+      "expected_windows": {
+        "items": ["a.TXT", "b.txt"],
+        "edit_lines": ["a.TXT", "b.txt"],
+        "pairs": [
+          {"old": "a.TXT", "new": "a.TXT"},
+          {"old": "b.txt", "new": "b.txt"}
+        ]
+      }
+    },
+    {
+      "name": "depth_one_excludes_directories_and_sanitizes_edit",
+      "inputs": ["album"],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": true,
+        "subdirs_depth": 1,
+        "sort_by": "name",
+        "path_type": "stem",
+        "apply_rules": false,
+        "exclude": {"dirs": true}
+      },
+      "edited_lines": ["renamed<bad>"],
+      "expected": {
+        "items": ["album/first 01.txt"],
+        "edit_lines": ["first 01"],
+        "pairs": [
+          {"old": "album/first 01.txt", "new": "album/renamed_bad_.txt"}
+        ]
+      }
+    },
+    {
+      "name": "depth_two_rules_and_counter_follow_sorted_order",
+      "inputs": ["album"],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": true,
+        "subdirs_depth": 2,
+        "sort_by": "path",
+        "path_type": "name",
+        "exclude": {"hidden": false},
+        "auto_rules": [
+          {
+            "scope": "stem",
+            "kind": "regex",
+            "find": "^.*$",
+            "replace": "item_<n>1;2;1;"
+          }
+        ]
+      },
+      "expected": {
+        "items": [
+          "album/first 01.txt",
+          "album/sub",
+          "album/sub/deep",
+          "album/sub/second.txt"
+        ],
+        "edit_lines": ["first 01.txt", "sub", "deep", "second.txt"],
+        "pairs": [
+          {"old": "album/first 01.txt", "new": "album/item_01.txt"},
+          {"old": "album/sub", "new": "album/item_02"},
+          {"old": "album/sub/deep", "new": "album/sub/item_03"},
+          {"old": "album/sub/second.txt", "new": "album/sub/item_04.txt"}
+        ]
+      }
+    },
+    {
+      "name": "overlapping_directories_dedupe_and_extension_edits",
+      "inputs": ["album", "album/sub"],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": true,
+        "subdirs_depth": 3,
+        "sort_by": "path",
+        "path_type": "ext",
+        "apply_rules": false,
+        "exclude": {"dirs": true}
+      },
+      "edited_lines": [".md", ".data", ""],
+      "expected": {
+        "items": [
+          "album/first 01.txt",
+          "album/sub/deep/third.txt",
+          "album/sub/second.txt"
+        ],
+        "edit_lines": [".txt", ".txt", ".txt"],
+        "pairs": [
+          {"old": "album/first 01.txt", "new": "album/first 01.md"},
+          {"old": "album/sub/deep/third.txt", "new": "album/sub/deep/third.data"},
+          {"old": "album/sub/second.txt", "new": "album/sub/second"}
+        ]
+      }
+    },
+    {
+      "name": "root_expansion_can_keep_only_directories",
+      "inputs": [""],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": true,
+        "subdirs_depth": 1,
+        "sort_by": "name",
+        "path_type": "name",
+        "apply_rules": false,
+        "exclude": {"files": true, "hidden": false}
+      },
+      "expected": {
+        "items": [".hidden-dir", "album", "empty"],
+        "edit_lines": [".hidden-dir", "album", "empty"],
+        "pairs": [
+          {"old": ".hidden-dir", "new": ".hidden-dir"},
+          {"old": "album", "new": "album"},
+          {"old": "empty", "new": "empty"}
+        ]
+      }
+    },
+    {
+      "name": "size_sort_reverse_uses_metadata",
+      "inputs": ["a.TXT", "b.txt", "c.md"],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": false,
+        "sort_by": "size",
+        "sort_reverse": true,
+        "path_type": "stem",
+        "apply_rules": false,
+        "exclude": {"hidden": false}
+      },
+      "expected": {
+        "items": ["c.md", "b.txt", "a.TXT"],
+        "edit_lines": ["c", "b", "a"],
+        "pairs": [
+          {"old": "c.md", "new": "c.md"},
+          {"old": "b.txt", "new": "b.txt"},
+          {"old": "a.TXT", "new": "a.TXT"}
+        ]
+      }
+    },
+    {
+      "name": "missing_input_reports_no_files",
+      "inputs": ["missing.txt"],
+      "config": {"open_editor": false},
+      "expected_error": "no_files"
+    },
+    {
+      "name": "exclude_all_reports_no_files_after_exclude",
+      "inputs": ["a.TXT", "b.txt"],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": false,
+        "exclude": {"files": true, "hidden": false}
+      },
+      "expected_error": "no_files_after_exclude"
+    },
+    {
+      "name": "edited_line_count_mismatch_aborts_plan",
+      "inputs": ["a.TXT", "b.txt"],
+      "config": {
+        "open_editor": false,
+        "expand_subdirs": false,
+        "sort_by": "name",
+        "path_type": "stem",
+        "exclude": {"hidden": false}
+      },
+      "edited_lines": ["only-one-line"],
+      "expected_error": "line_count"
+    }
+  ]
+}

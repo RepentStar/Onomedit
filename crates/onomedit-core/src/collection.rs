@@ -21,7 +21,7 @@ pub fn read_stream_paths(reader: impl BufRead) -> io::Result<Vec<String>> {
 
 pub fn collect_paths(raw_paths: &[String]) -> Vec<PathBuf> {
     let options = MatchOptions {
-        case_sensitive: true,
+        case_sensitive: !cfg!(windows),
         require_literal_separator: false,
         require_literal_leading_dot: true,
     };
