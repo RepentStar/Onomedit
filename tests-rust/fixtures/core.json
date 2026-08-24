@@ -18,12 +18,85 @@
     {"kind": "title", "input": "hello world", "expected": "Hello World"},
     {"kind": "fullwidth", "input": "A 1!", "expected": "Ａ　１！"},
     {"kind": "halfwidth", "input": "Ａ　１！", "expected": "A 1!"},
-    {"kind": "urldecode", "input": "%E4%B8%AD%E6%96%87%20x", "expected": "中文 x"}
+    {"kind": "urldecode", "input": "%E4%B8%AD%E6%96%87%20x", "expected": "中文 x"},
+    {"kind": "title", "input": "hello 12world", "expected": "Hello 12World"},
+    {"kind": "title", "input": "ǆUNGLE ǄUKE ǅEN", "expected": "ǅungle ǅuke ǅen"},
+    {"kind": "title", "input": "they're bill's", "expected": "They'Re Bill'S"},
+    {"kind": "title", "input": "ßtraße İSTANBUL", "expected": "Sstraße İstanbul"},
+    {"kind": "title", "input": "ábc", "expected": "ÁBc"},
+    {"kind": "urldecode", "input": "bad%2Gvalue%FF", "expected": "bad%2Gvalue�"}
   ],
   "distances": [
     {"left": "", "right": "abc", "expected": 3},
     {"left": "abc", "right": "abc", "expected": 0},
     {"left": "kitten", "right": "sitting", "expected": 3},
     {"left": "中文", "right": "中问", "expected": 1}
+  ],
+  "rules": [
+    {"value": "banana", "rule": {"kind": "replace", "find": "a", "replace": "X"}, "expected": "bXnXnX"},
+    {"value": "Banana", "rule": {"kind": "replace_icase", "find": "a", "replace": "X"}, "expected": "BXnXnX"},
+    {"value": "Aa", "rule": {"kind": "replace_icase", "find": "a", "replace": "$1"}, "expected": "$1$1"},
+    {"value": "iIİıſK", "rule": {"kind": "replace_icase", "find": "i", "replace": "X"}, "expected": "XXXXſK"},
+    {"value": "iIİıſK", "rule": {"kind": "replace_icase", "find": "s", "replace": "X"}, "expected": "iIİıXK"},
+    {"value": "iIİıſK", "rule": {"kind": "replace_icase", "find": "k", "replace": "X"}, "expected": "iIİıſX"},
+    {"value": "SSßẞ", "rule": {"kind": "replace_icase", "find": "ß", "replace": "X"}, "expected": "SSXX"},
+    {"value": "img12x34", "rule": {"kind": "regex", "find": "(\\d+)", "replace": "[\\1]"}, "expected": "img[12]x[34]"},
+    {"value": "ab ab", "rule": {"kind": "regex", "find": "(a)(b)", "replace": "\\2\\1"}, "expected": "ba ba"},
+    {"value": "abc 12 def", "rule": {"kind": "regex", "find": "(?P<word>[a-z]+)", "replace": "<\\g<word>>"}, "expected": "<abc> 12 <def>"},
+    {"value": "a", "rule": {"kind": "regex", "find": "(a)", "replace": "\\g<1>"}, "expected": "a"},
+    {"value": "a", "rule": {"kind": "regex", "find": "(a)", "replace": "$1"}, "expected": "$1"},
+    {"value": "a", "rule": {"kind": "regex", "find": "(a)", "replace": "\\\\1"}, "expected": "\\1"},
+    {"value": "a", "rule": {"kind": "regex", "find": "(a)", "replace": "\\2"}, "expected": "a"},
+    {"value": "file12 x12", "rule": {"kind": "regex", "find": "(?<=file)\\d+", "replace": "X"}, "expected": "fileX x12"},
+    {"value": "cat", "rule": {"kind": "replace", "find": "a", "replace": "b", "condition": "^cat"}, "expected": "cbt"},
+    {"value": "cat", "rule": {"kind": "replace", "find": "a", "replace": "b", "condition": "("}, "expected": "cat"},
+    {"value": "abc", "rule": {"kind": "insert", "insert": ">", "insert_at": "start"}, "expected": ">abc"},
+    {"value": "abc", "rule": {"kind": "insert", "insert": "<", "insert_at": "end"}, "expected": "abc<"},
+    {"value": "abc", "rule": {"kind": "replace", "find": "a", "replace": "b", "enabled": false}, "expected": "abc"}
+  ],
+  "template_sequences": [
+    {
+      "inputs": [
+        {"text": "<n>1;2;1;"},
+        {"text": "x<n>1;2;1; y<n>1;2;1;"}
+      ],
+      "expected": ["01", "x02 y03"]
+    },
+    {
+      "inputs": [
+        {"text": "<n>1;2;1;"},
+        {"text": "<n>5;2;1;"},
+        {"text": "<n>1;2;1"}
+      ],
+      "expected": ["01", "05", "02"]
+    },
+    {
+      "inputs": [
+        {"text": "标题-<clip>", "clip_text": "剪贴板文本"},
+        {"text": "标题-<clip>", "clip_text": "a\nb"},
+        {"text": "a <x> b"},
+        {"text": "a <n>1;2; b"}
+      ],
+      "expected": ["标题-剪贴板文本", "标题-<clip>", "a <x> b", "a <n>1;2; b"]
+    }
+  ],
+  "date_formats": [
+    {"pattern": "yyyy-MM-dd", "expected": "2026-08-12"},
+    {"pattern": "yy/M/d", "expected": "26/8/12"},
+    {"pattern": "HH:mm:ss", "expected": "09:05:03"},
+    {"pattern": "hh:mm", "expected": "09:05"},
+    {"pattern": "H:m:s", "expected": "9:5:3"},
+    {"pattern": "fff", "expected": "123"},
+    {"pattern": "", "expected": "2026-08-12 09:05:03"}
+  ],
+  "diffs": [
+    {"left": "abxcd", "right": "abycd", "expected": "ab[-x-][+y+]cd"},
+    {"left": "qabxcd", "right": "abycdf", "expected": "[-q-]ab[-x-][+y+]cd[+f+]"},
+    {"left": "one two three", "right": "one 2 three", "expected": "one [-two-][+2+] three"},
+    {"left": "aaaaab", "right": "baaaaa", "expected": "[+b+]aaaaa[-b-]"},
+    {"left": "ABCDEF", "right": "ABxyDEzF", "expected": "AB[-C-][+xy+]DE[+z+]F"},
+    {"left": "中文文件", "right": "中问文档", "expected": "中[+问+]文[-文件-][+档+]"},
+    {"left": "", "right": "abc", "expected": "[+abc+]"},
+    {"left": "abc", "right": "", "expected": "[-abc-]"}
   ]
 }

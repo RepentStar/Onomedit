@@ -15,22 +15,40 @@ pub fn capitalize(text: &str) -> String {
 }
 
 pub fn title(text: &str) -> String {
-    let mut at_word_start = true;
+    let mut previous_is_cased = false;
     let mut output = String::with_capacity(text.len());
     for ch in text.chars() {
-        if ch.is_alphanumeric() {
-            if at_word_start {
-                output.extend(ch.to_uppercase());
-            } else {
-                output.extend(ch.to_lowercase());
-            }
-            at_word_start = false;
+        let mapping = if previous_is_cased {
+            unicode_case_mapping::to_lowercase(ch).to_vec()
         } else {
-            output.push(ch);
-            at_word_start = true;
-        }
+            unicode_case_mapping::to_titlecase(ch).to_vec()
+        };
+        push_mapping(&mut output, ch, &mapping);
+        previous_is_cased = is_cased(ch);
     }
     output
+}
+
+fn is_cased(ch: char) -> bool {
+    ch.is_lowercase()
+        || ch.is_uppercase()
+        || unicode_case_mapping::to_lowercase(ch)[0] != 0
+        || unicode_case_mapping::to_uppercase(ch)[0] != 0
+        || unicode_case_mapping::to_titlecase(ch)[0] != 0
+}
+
+fn push_mapping(output: &mut String, original: char, mapping: &[u32]) {
+    if mapping.first().copied().unwrap_or_default() == 0 {
+        output.push(original);
+        return;
+    }
+    output.extend(
+        mapping
+            .iter()
+            .copied()
+            .take_while(|codepoint| *codepoint != 0)
+            .filter_map(char::from_u32),
+    );
 }
 
 pub fn fullwidth(text: &str) -> String {
@@ -92,4 +110,17 @@ pub fn apply(kind: &str, text: &str) -> Option<String> {
         "urldecode" => url_decode(text),
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn title_matches_python_word_and_unicode_semantics() {
+        assert_eq!(title("hello 12world"), "Hello 12World");
+        assert_eq!(title("ǆUNGLE ǄUKE ǅEN"), "ǅungle ǅuke ǅen");
+        assert_eq!(title("ßtraße İSTANBUL"), "Sstraße İstanbul");
+        assert_eq!(title("a\u{301}bc"), "A\u{301}Bc");
+    }
 }

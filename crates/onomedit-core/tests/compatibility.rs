@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 
-use onomedit_core::diff::levenshtein;
+use chrono::{Local, TimeZone, Timelike};
+use onomedit_core::diff::{diff_text, levenshtein};
 use onomedit_core::path::PathItem;
+use onomedit_core::rules::{self, Rule};
+use onomedit_core::template::{EnvContext, EnvVars, SystemValueSource, format_date};
 use onomedit_core::{safe_name, transforms};
 use serde::Deserialize;
 
@@ -11,6 +14,10 @@ struct Fixture {
     paths: Vec<PathCase>,
     transforms: Vec<TransformCase>,
     distances: Vec<DistanceCase>,
+    rules: Vec<RuleCase>,
+    template_sequences: Vec<TemplateSequence>,
+    date_formats: Vec<DateFormatCase>,
+    diffs: Vec<DiffCase>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -39,6 +46,38 @@ struct DistanceCase {
     left: String,
     right: String,
     expected: usize,
+}
+
+#[derive(Debug, Deserialize)]
+struct RuleCase {
+    value: String,
+    rule: Rule,
+    expected: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct TemplateSequence {
+    inputs: Vec<TemplateInput>,
+    expected: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct TemplateInput {
+    text: String,
+    clip_text: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct DateFormatCase {
+    pattern: String,
+    expected: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct DiffCase {
+    left: String,
+    right: String,
+    expected: String,
 }
 
 fn fixture() -> Fixture {
@@ -78,5 +117,51 @@ fn shared_transform_cases_match() {
 fn shared_distance_cases_match() {
     for case in fixture().distances {
         assert_eq!(levenshtein(&case.left, &case.right), case.expected);
+    }
+}
+
+#[test]
+fn shared_rule_cases_match() {
+    for case in fixture().rules {
+        assert_eq!(rules::apply(&case.value, &case.rule), case.expected);
+    }
+}
+
+#[test]
+fn shared_template_sequences_match() {
+    for sequence in fixture().template_sequences {
+        let mut env = EnvVars::new(SystemValueSource);
+        let actual: Vec<String> = sequence
+            .inputs
+            .into_iter()
+            .map(|input| {
+                let context = EnvContext {
+                    file: String::new(),
+                    clip_text: input.clip_text,
+                };
+                env.expand(&input.text, Some(&context))
+            })
+            .collect();
+        assert_eq!(actual, sequence.expected);
+    }
+}
+
+#[test]
+fn shared_date_formats_match() {
+    let date = Local
+        .with_ymd_and_hms(2026, 8, 12, 9, 5, 3)
+        .single()
+        .unwrap()
+        .with_nanosecond(123_000_000)
+        .unwrap();
+    for case in fixture().date_formats {
+        assert_eq!(format_date(&case.pattern, date), case.expected);
+    }
+}
+
+#[test]
+fn shared_diff_cases_match() {
+    for case in fixture().diffs {
+        assert_eq!(diff_text(&case.left, &case.right), case.expected);
     }
 }
