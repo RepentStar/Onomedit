@@ -89,6 +89,19 @@ def test_launcher_type_timeout_continues(tmp_path):
     assert any("超时" in s for s in statuses)
 
 
+def test_running_editor_timeout_continues(tmp_path):
+    """编辑器进程持续存活：达到总等待超时后按当前内容继续。"""
+    p = _write(tmp_path)
+    sig = tempfile_mgr.signature(p)
+    statuses = []
+    cmd = fake_editor_cmd("sleep", "0.5")
+
+    editor.launch_and_wait(cmd, p, sig, timeout=0.15, on_status=statuses.append)
+
+    assert not tempfile_mgr.changed(sig, tempfile_mgr.signature(p))
+    assert any("等待编辑器超时" in status for status in statuses)
+
+
 def test_multi_tab_polls_save(tmp_path):
     """多标签型：不依赖进程退出，直接轮询等待保存。"""
     p = _write(tmp_path)
