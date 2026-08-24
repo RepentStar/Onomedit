@@ -1,5 +1,5 @@
 use std::fs::{self, OpenOptions};
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 pub const SEPARATOR: &str = "<-->";
@@ -81,12 +81,17 @@ fn append(path: &Path, text: &str) {
         let _ = fs::create_dir_all(parent);
     }
     if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(path) {
-        let _ = file.write_all(text.as_bytes());
+        if cfg!(windows) {
+            let text = text.replace('\n', "\r\n");
+            let _ = file.write_all(text.as_bytes());
+        } else {
+            let _ = file.write_all(text.as_bytes());
+        }
     }
 }
 
 pub fn parse_line(line: &str) -> io::Result<(PathBuf, PathBuf)> {
-    line.trim_end_matches(['\r', '\n'])
+    line.trim_end_matches('\n')
         .rsplit_once(SEPARATOR)
         .map(|(old, new)| (PathBuf::from(old), PathBuf::from(new)))
         .ok_or_else(|| {
@@ -98,14 +103,14 @@ pub fn parse_line(line: &str) -> io::Result<(PathBuf, PathBuf)> {
 }
 
 fn read_pairs(path: &Path) -> Vec<(PathBuf, PathBuf)> {
-    let Ok(file) = fs::File::open(path) else {
+    let Ok(contents) = fs::read_to_string(path) else {
         return Vec::new();
     };
-    BufReader::new(file)
-        .lines()
-        .map_while(Result::ok)
+    let contents = contents.replace("\r\n", "\n").replace('\r', "\n");
+    contents
+        .split('\n')
         .filter(|line| !line.is_empty())
-        .filter_map(|line| parse_line(&line).ok())
+        .filter_map(|line| parse_line(line).ok())
         .collect()
 }
 

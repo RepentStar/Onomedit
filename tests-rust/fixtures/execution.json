@@ -215,5 +215,42 @@
         ]
       }
     }
+  ],
+  "journal_read_cases": [
+    {
+      "name": "valid_invalid_blank_and_last_separator",
+      "text": "\ninvalid line\nold.txt<-->new.txt\nwith<-->separator<-->target.txt\nempty-new<-->\n<-->empty-old\n",
+      "expected": [
+        {"old": "old.txt", "new": "new.txt"},
+        {"old": "with<-->separator", "new": "target.txt"},
+        {"old": "empty-new", "new": ""},
+        {"old": "", "new": "empty-old"}
+      ]
+    },
+    {
+      "name": "universal_crlf_and_cr_newlines",
+      "text": "one<-->two\r\nthree<-->four\rfive<-->six\n",
+      "expected": [
+        {"old": "one", "new": "two"},
+        {"old": "three", "new": "four"},
+        {"old": "five", "new": "six"}
+      ]
+    },
+    {
+      "name": "invalid_utf8_discards_entire_log",
+      "bytes_hex": "6f6c642e7478743c2d2d3e6e65772e7478740aff0a61667465723c2d2d3e7461726765740a",
+      "expected": []
+    },
+    {
+      "name": "missing_log_is_empty",
+      "missing": true,
+      "expected": []
+    }
+  ],
+  "parse_line_cases": [
+    {"name": "lf_is_removed", "line": "a<-->b\n", "old": "a", "new": "b"},
+    {"name": "crlf_keeps_carriage_return", "line": "a<-->b\r\n", "old": "a", "new": "b\r"},
+    {"name": "last_separator_wins", "line": "a<-->b<-->c", "old": "a<-->b", "new": "c"},
+    {"name": "missing_separator_errors", "line": "invalid", "error": true}
   ]
 }

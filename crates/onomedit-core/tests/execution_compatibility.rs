@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-use onomedit_core::journal::{ROTATE_BYTES, RenameLogger, SEPARATOR};
+use onomedit_core::journal::{ROTATE_BYTES, ROTATE_KEEP, RenameLogger, SEPARATOR, parse_line};
 use onomedit_core::pipeline::{RenamePair, RenameResult, Renamer, restore};
 use serde::Deserialize;
 
@@ -10,6 +10,8 @@ use serde::Deserialize;
 struct Fixture {
     execute_cases: Vec<ExecuteCase>,
     restore_cases: Vec<RestoreCase>,
+    journal_read_cases: Vec<JournalReadCase>,
+    parse_line_cases: Vec<ParseLineCase>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -40,6 +42,26 @@ struct RestoreCase {
 struct Pair {
     old: String,
     new: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct JournalReadCase {
+    name: String,
+    text: Option<String>,
+    bytes_hex: Option<String>,
+    #[serde(default)]
+    missing: bool,
+    expected: Vec<Pair>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ParseLineCase {
+    name: String,
+    line: String,
+    old: Option<String>,
+    new: Option<String>,
+    #[serde(default)]
+    error: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -253,4 +275,128 @@ fn shared_history_rotation_boundary() {
         vec![(PathBuf::from("old.txt"), PathBuf::from("new.txt"))]
     );
     assert_eq!(logger.read_last(), logger.read_history());
+}
+
+fn decode_hex(value: &str) -> Vec<u8> {
+    value
+        .as_bytes()
+        .chunks_exact(2)
+        .map(|pair| {
+            let text = std::str::from_utf8(pair).unwrap();
+            u8::from_str_radix(text, 16).unwrap()
+        })
+        .collect()
+}
+
+fn plain_pairs(pairs: &[(PathBuf, PathBuf)]) -> Vec<Pair> {
+    pairs
+        .iter()
+        .map(|(old, new)| Pair {
+            old: old.to_string_lossy().into_owned(),
+            new: new.to_string_lossy().into_owned(),
+        })
+        .collect()
+}
+
+#[test]
+fn shared_journal_read_cases_match() {
+    for case in fixture().journal_read_cases {
+        let directory = tempfile::tempdir().unwrap();
+        let logger = RenameLogger::new(directory.path().join("log"));
+        if !case.missing {
+            fs::create_dir(&logger.log_dir).unwrap();
+            let contents = case
+                .bytes_hex
+                .as_deref()
+                .map(decode_hex)
+                .unwrap_or_else(|| case.text.unwrap().into_bytes());
+            fs::write(&logger.history_path, contents).unwrap();
+        }
+        assert_eq!(
+            plain_pairs(&logger.read_history()),
+            case.expected,
+            "{}",
+            case.name
+        );
+    }
+}
+
+#[test]
+fn shared_parse_line_cases_match() {
+    for case in fixture().parse_line_cases {
+        let parsed = parse_line(&case.line);
+        if case.error {
+            assert!(parsed.is_err(), "{}", case.name);
+        } else {
+            assert_eq!(
+                plain_pairs(&[parsed.unwrap()]),
+                vec![Pair {
+                    old: case.old.unwrap(),
+                    new: case.new.unwrap(),
+                }],
+                "{}",
+                case.name
+            );
+        }
+    }
+}
+
+#[test]
+fn shared_log_bytes_use_platform_newlines() {
+    let directory = tempfile::tempdir().unwrap();
+    let logger = RenameLogger::new(directory.path().join("log"));
+    logger.begin_session();
+    logger.record(Path::new("旧<-->.txt"), Path::new("新.txt"));
+    logger.record_error("first\nsecond\n\n");
+
+    let newline: &[u8] = if cfg!(windows) { b"\r\n" } else { b"\n" };
+    let mut pair = "旧<-->.txt<-->新.txt".as_bytes().to_vec();
+    pair.extend_from_slice(newline);
+    assert_eq!(fs::read(&logger.last_path).unwrap(), pair);
+    assert_eq!(fs::read(&logger.history_path).unwrap(), pair);
+    let mut error = b"first".to_vec();
+    error.extend_from_slice(newline);
+    error.extend_from_slice(b"second");
+    error.extend_from_slice(newline);
+    assert_eq!(fs::read(&logger.error_path).unwrap(), error);
+}
+
+#[test]
+fn shared_history_rotation_keeps_five_newest_generations() {
+    let directory = tempfile::tempdir().unwrap();
+    let logger = RenameLogger::new(directory.path().join("log"));
+    logger.begin_session();
+    for (index, marker) in b"ABCDEFG".iter().copied().enumerate() {
+        fs::write(
+            &logger.history_path,
+            vec![marker; ROTATE_BYTES as usize + 1],
+        )
+        .unwrap();
+        logger.record(
+            Path::new(&format!("old{index}")),
+            Path::new(&format!("new{index}")),
+        );
+    }
+
+    let newline: &[u8] = if cfg!(windows) { b"\r\n" } else { b"\n" };
+    let mut current = b"old6<-->new6".to_vec();
+    current.extend_from_slice(newline);
+    assert_eq!(fs::read(&logger.history_path).unwrap(), current);
+    for (generation, marker) in b"GFEDC".iter().copied().enumerate() {
+        assert_eq!(
+            fs::read(
+                logger
+                    .log_dir
+                    .join(format!("history.{}.log", generation + 1))
+            )
+            .unwrap(),
+            vec![marker; ROTATE_BYTES as usize + 1]
+        );
+    }
+    assert!(
+        !logger
+            .log_dir
+            .join(format!("history.{}.log", ROTATE_KEEP + 1))
+            .exists()
+    );
 }

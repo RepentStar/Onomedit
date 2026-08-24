@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from onomedit.core.logger import ROTATE_BYTES, SEPARATOR, RenameLogger
+from onomedit.core.logger import ROTATE_BYTES, ROTATE_KEEP, SEPARATOR, RenameLogger, parse_line
 from onomedit.core.pipeline import DuplicateTargetError, RenameResult, Renamer, restore
 
 
@@ -120,3 +120,59 @@ def test_shared_history_rotation_boundary(tmp_path):
     assert (logger.log_dir / "history.1.log").stat().st_size == ROTATE_BYTES + 1
     assert logger.read_history() == [("old.txt", "new.txt")]
     assert logger.read_last() == [("old.txt", "new.txt")]
+
+
+@pytest.mark.parametrize("case", _fixture()["journal_read_cases"], ids=lambda case: case["name"])
+def test_shared_journal_read_cases(tmp_path, case):
+    logger = RenameLogger(tmp_path / "log")
+    if not case.get("missing"):
+        logger.log_dir.mkdir()
+        if "bytes_hex" in case:
+            logger.history_path.write_bytes(bytes.fromhex(case["bytes_hex"]))
+        else:
+            logger.history_path.write_bytes(case["text"].encode("utf-8"))
+    assert [
+        {"old": old, "new": new} for old, new in logger.read_history()
+    ] == case["expected"]
+
+
+@pytest.mark.parametrize("case", _fixture()["parse_line_cases"], ids=lambda case: case["name"])
+def test_shared_parse_line_cases(case):
+    if case.get("error"):
+        with pytest.raises(ValueError):
+            parse_line(case["line"])
+    else:
+        assert parse_line(case["line"]) == (case["old"], case["new"])
+
+
+def test_shared_log_bytes_use_platform_newlines(tmp_path):
+    import os
+
+    logger = RenameLogger(tmp_path / "log")
+    logger.begin_session()
+    logger.record("旧<-->.txt", "新.txt")
+    logger.record_error("first\nsecond\n\n")
+
+    newline = os.linesep.encode()
+    pair = "旧<-->.txt<-->新.txt".encode() + newline
+    assert logger.last_path.read_bytes() == pair
+    assert logger.history_path.read_bytes() == pair
+    assert logger.error_path.read_bytes() == b"first" + newline + b"second" + newline
+
+
+def test_shared_history_rotation_keeps_five_newest_generations(tmp_path):
+    import os
+
+    logger = RenameLogger(tmp_path / "log")
+    logger.begin_session()
+    for index, marker in enumerate(b"ABCDEFG"):
+        logger.history_path.write_bytes(bytes([marker]) * (ROTATE_BYTES + 1))
+        logger.record(f"old{index}", f"new{index}")
+
+    newline = os.linesep.encode()
+    assert logger.history_path.read_bytes() == b"old6<-->new6" + newline
+    for generation, marker in enumerate(reversed(b"CDEFG"), start=1):
+        assert (logger.log_dir / f"history.{generation}.log").read_bytes() == (
+            bytes([marker]) * (ROTATE_BYTES + 1)
+        )
+    assert not (logger.log_dir / f"history.{ROTATE_KEEP + 1}.log").exists()
