@@ -117,7 +117,7 @@ pub enum ConfigError {
     Io(#[from] std::io::Error),
     #[error("配置 JSON 错误: {0}")]
     Json(#[from] serde_json::Error),
-    #[error("未知配置键 {0:?}")]
+    #[error("未知配置键 '{0}'")]
     UnknownKey(String),
     #[error("{0}")]
     InvalidValue(String),

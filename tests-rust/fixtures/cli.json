@@ -1,0 +1,118 @@
+{
+  "cases": [
+    {
+      "name": "version",
+      "args": ["version"],
+      "exit_code": 0,
+      "stdout": "onomedit 0.1.6\n",
+      "stdout_windows": "onomedit 0.1.6\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "empty_last_history",
+      "args": ["history"],
+      "exit_code": 0,
+      "stdout": "（空）\n",
+      "stdout_windows": "（空）\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "empty_all_history",
+      "args": ["history", "--all"],
+      "exit_code": 0,
+      "stdout": "（空）\n",
+      "stdout_windows": "（空）\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "empty_restore",
+      "args": ["restore"],
+      "exit_code": 0,
+      "stdout": "恢复完成: 成功 0 / 失败 0 / 无变化 0 / 总计 0\n",
+      "stdout_windows": "恢复完成: 成功 0 / 失败 0 / 无变化 0 / 总计 0\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "config_reset",
+      "args": ["config", "reset"],
+      "exit_code": 0,
+      "stdout": "配置已重置为默认值\n",
+      "stdout_windows": "配置已重置为默认值\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "config_set_boolean",
+      "args": ["config", "set", "sort_reverse", "true"],
+      "exit_code": 0,
+      "stdout": "sort_reverse = true\n",
+      "stdout_windows": "sort_reverse = true\r\n",
+      "stderr": ""
+    },
+    {
+      "name": "config_unknown_key",
+      "args": ["config", "set", "missing", "value"],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "错误: 未知配置键 'missing'\n",
+      "stderr_windows": "错误: 未知配置键 'missing'\r\n"
+    },
+    {
+      "name": "unknown_help_topic",
+      "args": ["help", "missing"],
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "未知子命令: missing（可执行 onomedit help 查看全部）\n",
+      "stderr_windows": "未知子命令: missing（可执行 onomedit help 查看全部）\r\n"
+    },
+    {
+      "name": "empty_pipe_does_not_fall_back",
+      "args": ["rename"],
+      "stdin": "",
+      "exit_code": 1,
+      "stdout": "",
+      "stderr": "错误: 管道未提供任何路径\n",
+      "stderr_windows": "错误: 管道未提供任何路径\r\n"
+    },
+    {
+      "name": "root_help_surface",
+      "args": ["help"],
+      "exit_code": 0,
+      "stdout_contains": [
+        "结合外部编辑器进行批量文件重命名的工具",
+        "completion",
+        "config",
+        "gui",
+        "help",
+        "history",
+        "rename",
+        "restore",
+        "version"
+      ],
+      "stderr": ""
+    },
+    {
+      "name": "rename_help_surface",
+      "args": ["help", "rename"],
+      "exit_code": 0,
+      "stdout_contains": [
+        "文件/目录路径",
+        "--dry-run",
+        "--no-editor",
+        "--path-type",
+        "--multi-tab",
+        "--timeout",
+        "--sort-by",
+        "--reverse",
+        "--depth",
+        "--exclude"
+      ],
+      "stderr": ""
+    },
+    {
+      "name": "automatic_help_flag_is_rejected",
+      "args": ["--help"],
+      "exit_code": 2,
+      "stdout": ""
+    }
+  ]
+}

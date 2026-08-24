@@ -46,7 +46,7 @@ _onomedit
         ),
         "pwsh" => format!(
             r#"# PowerShell completion for onomedit
-Register-ArgumentCompleter -Native -CommandName onomedit,onomedit.exe,onomedit-cli,onomedit-cli.exe -ScriptBlock {{
+Register-ArgumentCompleter -Native -CommandName onomedit, onomedit.exe -ScriptBlock {{
   param($wordToComplete, $commandAst, $cursorPosition)
   $tokens = $commandAst.CommandElements | ForEach-Object {{ $_.Extent.Text }}
   $commands = '{COMMANDS}'.Split(' ')
@@ -72,15 +72,65 @@ Register-ArgumentCompleter -Native -CommandName onomedit,onomedit.exe,onomedit-c
             }
             output
         }
-        "psc" => format!(
-            r#"# PSCompletions definition for onomedit
-$OnomeditCompletions = @{{
-  Commands = '{COMMANDS}'.Split(' ')
-  RenameOptions = '{RENAME_FLAGS}'.Split(' ')
-  Shells = 'bash','zsh','pwsh','fish','psc'
-}}
+        "psc" => r#"# PSCompletions completion for onomedit
+# 生成: onomedit completion psc
+# 配合 PSCompletions 模块使用；候选带中文 tip。
+Register-ArgumentCompleter -CommandName onomedit, onomedit.exe -ScriptBlock {
+  param($wordToComplete, $commandAst, $cursorPosition)
+  [Console]::InputEncoding = [Console]::OutputEncoding = $OutputEncoding = [System.Text.Utf8Encoding]::new()
+  $tokens = $commandAst.CommandElements | ForEach-Object { $_.Extent.Text }
+  $cmds = '{COMMANDS}'.Split(' ')
+  $cmd = if ($tokens.Count -gt 1 -and $cmds -contains $tokens[1]) { $tokens[1] } else { '' }
+  $commands = @(
+    @{ name='completion'; tip='生成 shell 补全脚本' }
+    @{ name='config'; tip='查看/设置配置' }
+    @{ name='gui'; tip='启动图形界面' }
+    @{ name='help'; tip='显示帮助信息' }
+    @{ name='history'; tip='查看重命名日志' }
+    @{ name='rename'; tip='编辑器模式批量重命名' }
+    @{ name='restore'; tip='恢复重命名' }
+    @{ name='version'; tip='版本信息' }
+  )
+  $valueMap = @{
+    '--path-type' = @(
+      @{ name='full'; tip='完整路径' }, @{ name='name'; tip='仅文件名' },
+      @{ name='stem'; tip='不含扩展名' }, @{ name='ext'; tip='仅扩展名' }
+    )
+    '--sort-by' = 'default','name','path','mtime','ctime','size' | ForEach-Object { @{ name=$_; tip=$_ } }
+    '--exclude' = 'f','file','d','dir','l','link','r','readonly','h','hidden','s','system' | ForEach-Object { @{ name=$_; tip=$_ } }
+  }
+  $renameOpts = @(
+    @{ name='--dry-run'; tip='预览不执行' }
+    @{ name='--no-editor'; tip='跳过编辑器直接重命名' }
+    @{ name='--multi-tab'; tip='多标签编辑器适配' }
+    @{ name='--reverse'; tip='反转排序顺序' }
+    @{ name='--timeout'; tip='编辑器等待超时（秒）' }
+    @{ name='--depth'; tip='目录搜索深度（层级）' }
+    @{ name='--sort-by'; tip='重命名顺序' }
+    @{ name='--exclude'; tip='排除的类型' }
+    @{ name='--path-type'; tip='路径类型' }
+  )
+  $last = if ($tokens.Count -gt 0) { $tokens[-1] } else { '' }
+  if ($valueMap.ContainsKey($last)) {
+    $valueMap[$last] | Where-Object { $_.name -like "$wordToComplete*" } |
+      ForEach-Object { [System.Management.Automation.CompletionResult]::new($_.name, $_.name, 'ParameterValue', $_.tip) }
+    return
+  }
+  $candidates = switch ($cmd) {
+    '' { $commands }
+    'rename' { $renameOpts }
+    'restore' { @{ name='--all'; tip='恢复全部历史' }, @{ name='--partial'; tip='用编辑器筛选日志行' } }
+    'history' { @{ name='--all'; tip='查看全部历史' } }
+    'config' { @{ name='set'; tip='设置配置项' }, @{ name='set-editor'; tip='设置编辑器' }, @{ name='reset'; tip='重置默认配置' } }
+    'completion' { 'bash','zsh','pwsh','fish','psc' | ForEach-Object { @{ name=$_; tip="生成 $_ 补全" } } }
+    'help' { $commands }
+    default { @() }
+  }
+  $candidates | Where-Object { $_.name -like "$wordToComplete*" } |
+    ForEach-Object { [System.Management.Automation.CompletionResult]::new($_.name, $_.name, 'ParameterValue', $_.tip) }
+}
 "#
-        ),
+        .replace("{COMMANDS}", COMMANDS),
         _ => return None,
     })
 }
@@ -100,6 +150,20 @@ mod tests {
             for command in COMMANDS.split_whitespace() {
                 assert!(script.contains(command), "{shell} omitted {command}");
             }
+            assert!(!script.as_bytes().windows(2).any(|bytes| bytes == b"\r\n"));
         }
+        let bash = generate("bash").unwrap();
+        for value in ["full", "name", "stem", "ext", "mtime", "readonly", "system"] {
+            assert!(bash.contains(value));
+        }
+        let pwsh = generate("pwsh").unwrap();
+        assert!(pwsh.contains("Register-ArgumentCompleter -Native"));
+        assert!(pwsh.contains("-CommandName onomedit, onomedit.exe"));
+        let psc = generate("psc").unwrap();
+        assert!(psc.contains("Register-ArgumentCompleter -CommandName onomedit, onomedit.exe"));
+        assert!(!psc.contains("Register-ArgumentCompleter -Native"));
+        assert!(psc.contains("tip='生成 shell 补全脚本'"));
+        assert!(psc.contains("tip='编辑器模式批量重命名'"));
+        assert!(psc.contains("tip='完整路径'"));
     }
 }
