@@ -1,0 +1,219 @@
+{
+  "execute_cases": [
+    {
+      "name": "simple_rename_and_unchanged_skip",
+      "files": {"a.txt": "A", "keep.txt": "KEEP"},
+      "pairs": [
+        {"old": "a.txt", "new": "renamed.txt"},
+        {"old": "keep.txt", "new": "keep.txt"}
+      ],
+      "expected": {
+        "success": [{"old": "a.txt", "new": "renamed.txt"}],
+        "failed": [],
+        "skipped": ["keep.txt"],
+        "tree": {"keep.txt": "KEEP", "renamed.txt": "A"},
+        "last": [{"old": "a.txt", "new": "renamed.txt"}],
+        "history": [{"old": "a.txt", "new": "renamed.txt"}]
+      }
+    },
+    {
+      "name": "real_conflict_uses_next_available_number",
+      "files": {"a.txt": "A", "b.txt": "B", "b (1).txt": "B1"},
+      "pairs": [{"old": "a.txt", "new": "b.txt"}],
+      "expected": {
+        "success": [{"old": "a.txt", "new": "b (2).txt"}],
+        "failed": [],
+        "skipped": [],
+        "tree": {"b.txt": "B", "b (1).txt": "B1", "b (2).txt": "A"},
+        "last": [{"old": "a.txt", "new": "b (2).txt"}],
+        "history": [{"old": "a.txt", "new": "b (2).txt"}]
+      }
+    },
+    {
+      "name": "two_node_swap_preserves_user_visible_log",
+      "files": {"a.txt": "AAA", "b.txt": "BBB"},
+      "pairs": [
+        {"old": "a.txt", "new": "b.txt"},
+        {"old": "b.txt", "new": "a.txt"}
+      ],
+      "expected": {
+        "success": [
+          {"old": "a.txt", "new": "b.txt"},
+          {"old": "b.txt", "new": "a.txt"}
+        ],
+        "failed": [],
+        "skipped": [],
+        "tree": {"a.txt": "BBB", "b.txt": "AAA"},
+        "last": [
+          {"old": "a.txt", "new": "b.txt"},
+          {"old": "b.txt", "new": "a.txt"}
+        ],
+        "history": [
+          {"old": "a.txt", "new": "b.txt"},
+          {"old": "b.txt", "new": "a.txt"}
+        ]
+      }
+    },
+    {
+      "name": "three_node_cycle_uses_two_phase_order",
+      "files": {"a.txt": "A", "b.txt": "B", "c.txt": "C"},
+      "pairs": [
+        {"old": "a.txt", "new": "b.txt"},
+        {"old": "b.txt", "new": "c.txt"},
+        {"old": "c.txt", "new": "a.txt"}
+      ],
+      "expected": {
+        "success": [
+          {"old": "a.txt", "new": "b.txt"},
+          {"old": "c.txt", "new": "a.txt"},
+          {"old": "b.txt", "new": "c.txt"}
+        ],
+        "failed": [],
+        "skipped": [],
+        "tree": {"a.txt": "C", "b.txt": "A", "c.txt": "B"},
+        "last": [
+          {"old": "a.txt", "new": "b.txt"},
+          {"old": "c.txt", "new": "a.txt"},
+          {"old": "b.txt", "new": "c.txt"}
+        ],
+        "history": [
+          {"old": "a.txt", "new": "b.txt"},
+          {"old": "c.txt", "new": "a.txt"},
+          {"old": "b.txt", "new": "c.txt"}
+        ]
+      }
+    },
+    {
+      "name": "missing_target_parent_is_created",
+      "files": {"source.txt": "SOURCE"},
+      "pairs": [{"old": "source.txt", "new": "new/nested/target.txt"}],
+      "expected": {
+        "success": [{"old": "source.txt", "new": "new/nested/target.txt"}],
+        "failed": [],
+        "skipped": [],
+        "tree": {"new/nested/target.txt": "SOURCE"},
+        "last": [{"old": "source.txt", "new": "new/nested/target.txt"}],
+        "history": [{"old": "source.txt", "new": "new/nested/target.txt"}]
+      }
+    },
+    {
+      "name": "duplicate_target_aborts_before_changes",
+      "files": {"a.txt": "A", "b.txt": "B"},
+      "pairs": [
+        {"old": "a.txt", "new": "same.txt"},
+        {"old": "b.txt", "new": "same.txt"}
+      ],
+      "duplicate_error": true,
+      "expected": {
+        "success": [],
+        "failed": [],
+        "skipped": [],
+        "tree": {"a.txt": "A", "b.txt": "B"},
+        "last": [],
+        "history": []
+      }
+    },
+    {
+      "name": "missing_source_failure_does_not_stop_later_items",
+      "files": {"a.txt": "A"},
+      "pairs": [
+        {"old": "ghost.txt", "new": "x.txt"},
+        {"old": "a.txt", "new": "renamed.txt"}
+      ],
+      "error_contains": ["ghost.txt", "x.txt"],
+      "expected": {
+        "success": [{"old": "a.txt", "new": "renamed.txt"}],
+        "failed": [{"old": "ghost.txt", "new": "x.txt"}],
+        "skipped": [],
+        "tree": {"renamed.txt": "A"},
+        "last": [{"old": "a.txt", "new": "renamed.txt"}],
+        "history": [{"old": "a.txt", "new": "renamed.txt"}]
+      }
+    }
+  ],
+  "restore_cases": [
+    {
+      "name": "partial_restore_uses_selected_log_lines",
+      "files": {"z.txt": "Z", "y.txt": "Y"},
+      "log_pairs": [
+        {"old": "a.txt", "new": "z.txt"},
+        {"old": "b.txt", "new": "y.txt"}
+      ],
+      "partial_indexes": [0],
+      "expected": {
+        "success": [{"old": "z.txt", "new": "a.txt"}],
+        "failed": [],
+        "skipped": [],
+        "tree": {"a.txt": "Z", "y.txt": "Y"},
+        "last": [
+          {"old": "a.txt", "new": "z.txt"},
+          {"old": "b.txt", "new": "y.txt"},
+          {"old": "z.txt", "new": "a.txt"}
+        ],
+        "history": [
+          {"old": "a.txt", "new": "z.txt"},
+          {"old": "b.txt", "new": "y.txt"},
+          {"old": "z.txt", "new": "a.txt"}
+        ]
+      }
+    },
+    {
+      "name": "restore_last_reverses_swap",
+      "files": {"a.txt": "BBB", "b.txt": "AAA"},
+      "log_pairs": [
+        {"old": "a.txt", "new": "b.txt"},
+        {"old": "b.txt", "new": "a.txt"}
+      ],
+      "expected": {
+        "success": [
+          {"old": "a.txt", "new": "b.txt"},
+          {"old": "b.txt", "new": "a.txt"}
+        ],
+        "failed": [],
+        "skipped": [],
+        "tree": {"a.txt": "AAA", "b.txt": "BBB"},
+        "last": [
+          {"old": "a.txt", "new": "b.txt"},
+          {"old": "b.txt", "new": "a.txt"},
+          {"old": "a.txt", "new": "b.txt"},
+          {"old": "b.txt", "new": "a.txt"}
+        ],
+        "history": [
+          {"old": "a.txt", "new": "b.txt"},
+          {"old": "b.txt", "new": "a.txt"},
+          {"old": "a.txt", "new": "b.txt"},
+          {"old": "b.txt", "new": "a.txt"}
+        ]
+      }
+    },
+    {
+      "name": "restore_all_uses_history_after_last_is_cleared",
+      "files": {"z.txt": "Z", "y.txt": "Y"},
+      "log_pairs": [
+        {"old": "a.txt", "new": "z.txt"},
+        {"old": "b.txt", "new": "y.txt"}
+      ],
+      "clear_last_before_restore": true,
+      "all_history": true,
+      "expected": {
+        "success": [
+          {"old": "y.txt", "new": "b.txt"},
+          {"old": "z.txt", "new": "a.txt"}
+        ],
+        "failed": [],
+        "skipped": [],
+        "tree": {"a.txt": "Z", "b.txt": "Y"},
+        "last": [
+          {"old": "y.txt", "new": "b.txt"},
+          {"old": "z.txt", "new": "a.txt"}
+        ],
+        "history": [
+          {"old": "a.txt", "new": "z.txt"},
+          {"old": "b.txt", "new": "y.txt"},
+          {"old": "y.txt", "new": "b.txt"},
+          {"old": "z.txt", "new": "a.txt"}
+        ]
+      }
+    }
+  ]
+}
