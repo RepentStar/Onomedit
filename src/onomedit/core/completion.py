@@ -6,11 +6,26 @@
 
 from __future__ import annotations
 
+from onomedit.i18n import EN_US, choose, get_language, tr
+
 # 值型选项的补全取值（flag -> 候选）；行内末尾加 = 让 shell 补 `=`.
 _VALUE_CHOICES: dict[str, list[str]] = {
     "--path-type": ["full", "name", "stem", "ext"],
     "--sort-by": ["default", "name", "path", "mtime", "ctime", "size"],
-    "--exclude": ["f", "file", "d", "dir", "l", "link", "r", "readonly", "h", "hidden", "s", "system"],
+    "--exclude": [
+        "f",
+        "file",
+        "d",
+        "dir",
+        "l",
+        "link",
+        "r",
+        "readonly",
+        "h",
+        "hidden",
+        "s",
+        "system",
+    ],
 }
 
 # 子命令 -> 布尔选项（无取值）。config 的子操作在 {config} 里单独处理。
@@ -21,14 +36,25 @@ _BOOL_FLAGS: dict[str, list[str]] = {
 }
 _VALUE_FLAGS: dict[str, list[str]] = {
     "rename": [
-        "--timeout", "--depth", "--sort-by", "--exclude", "--path-type",
+        "--timeout",
+        "--depth",
+        "--sort-by",
+        "--exclude",
+        "--path-type",
     ],
 }
 _CONFIG_ACTIONS = ["set", "set-editor", "reset"]
 
 # 全部子命令（含 completion 自身），作为各级补全顶层的候选顺序。
 SUBCOMMANDS = [
-    "completion", "config", "gui", "help", "history", "rename", "restore", "version",
+    "completion",
+    "config",
+    "gui",
+    "help",
+    "history",
+    "rename",
+    "restore",
+    "version",
 ]
 
 # 面向 PSCompletions 自定义补全的中文提示（子命令 / 选项 / 取值）。
@@ -57,15 +83,32 @@ _FLAG_TIPS: dict[str, str] = {
 }
 _VALUE_TIPS: dict[str, dict[str, str]] = {
     "--path-type": {
-        "full": "完整路径", "name": "仅文件名", "stem": "不含扩展名", "ext": "仅扩展名",
+        "full": "完整路径",
+        "name": "仅文件名",
+        "stem": "不含扩展名",
+        "ext": "仅扩展名",
     },
     "--sort-by": {
-        "default": "默认", "name": "名称", "path": "路径", "mtime": "修改时间",
-        "ctime": "创建时间", "size": "大小",
+        "default": "默认",
+        "name": "名称",
+        "path": "路径",
+        "mtime": "修改时间",
+        "ctime": "创建时间",
+        "size": "大小",
     },
     "--exclude": {
-        "f": "文件", "file": "文件", "d": "目录", "dir": "目录", "l": "链接", "link": "链接",
-        "r": "只读", "readonly": "只读", "h": "隐藏", "hidden": "隐藏", "s": "系统", "system": "系统",
+        "f": "文件",
+        "file": "文件",
+        "d": "目录",
+        "dir": "目录",
+        "l": "链接",
+        "link": "链接",
+        "r": "只读",
+        "readonly": "只读",
+        "h": "隐藏",
+        "hidden": "隐藏",
+        "s": "系统",
+        "system": "系统",
     },
 }
 
@@ -83,20 +126,51 @@ def completion_for(shell: str) -> str:
         key = "pwsh"
     if key not in _SUPPORTED_SHELLS:
         raise ValueError(
-            f"未知 shell: {shell!r}（支持: {', '.join(_SUPPORTED_SHELLS)}）"
+            choose(
+                f"未知 shell: {shell!r}（支持: {', '.join(_SUPPORTED_SHELLS)}）",
+                f"Unknown shell: {shell!r} (supported: {', '.join(_SUPPORTED_SHELLS)})",
+            )
         )
-    return _GENERATORS[key]()
+    script = _GENERATORS[key]()
+    if get_language() != EN_US:
+        return script
+    replacements = (
+        ("生成 shell 补全脚本", "Generate a shell completion script"),
+        ("查看/设置配置", "View/change configuration"),
+        ("启动图形界面", "Start the graphical interface"),
+        ("显示帮助信息", "Show help"),
+        ("查看重命名日志", "View rename history"),
+        ("编辑器模式批量重命名", "Batch rename in editor mode"),
+        ("恢复重命名", "Restore renames"),
+        ("版本信息", "Version information"),
+        ("完整路径", "Full path"),
+        ("仅文件名", "File name only"),
+        ("不含扩展名", "Without extension"),
+        ("仅扩展名", "Extension only"),
+        ("生成", "Generate"),
+        ("补全", "completion"),
+        ("安装", "Install"),
+    )
+    for source, translated in replacements:
+        script = script.replace(source, translated)
+    return script
 
 
 def completion_usage() -> str:
     """stdout 安装提示（按 shell 给出对应写入命令）。"""
-    return (
+    return choose(
         "示例:\n"
         "  onomedit completion bash > ~/.local/share/bash-completion/completions/onomedit\n"
         "  onomedit completion zsh  > ~/.zfunc/_onomedit\n"
-        "  onomedit completion pwsh > \"$HOME\\Documents\\PowerShell\\onomedit.ps1\"\n"
+        '  onomedit completion pwsh > "$HOME\\Documents\\PowerShell\\onomedit.ps1"\n'
         "  onomedit completion fish > ~/.config/fish/completions/onomedit.fish\n"
-        "  onomedit completion psc  > \"$HOME\\Documents\\PowerShell\\onomedit.psc.ps1\""
+        '  onomedit completion psc  > "$HOME\\Documents\\PowerShell\\onomedit.psc.ps1"',
+        "Examples:\n"
+        "  onomedit completion bash > ~/.local/share/bash-completion/completions/onomedit\n"
+        "  onomedit completion zsh  > ~/.zfunc/_onomedit\n"
+        '  onomedit completion pwsh > "$HOME\\Documents\\PowerShell\\onomedit.ps1"\n'
+        "  onomedit completion fish > ~/.config/fish/completions/onomedit.fish\n"
+        '  onomedit completion psc  > "$HOME\\Documents\\PowerShell\\onomedit.psc.ps1"',
     )
 
 
@@ -178,7 +252,9 @@ def _bash_case(name: str, bools: list[str], values: list[str]) -> str:
 def _bash_value_case() -> str:
     lines = []
     for flag, vals in _VALUE_CHOICES.items():
-        lines.append(f'        {flag}) COMPREPLY=( $(compgen -W "{ " ".join(vals) }" -- "$cur") ); return 0 ;;')
+        lines.append(
+            f'        {flag}) COMPREPLY=( $(compgen -W "{" ".join(vals)}" -- "$cur") ); return 0 ;;'
+        )
     return "\n".join(lines)
 
 
@@ -313,25 +389,41 @@ def _pwsh_main_body(words: str) -> str:
     return "\n".join("  " + ln for ln in body.splitlines())
 
 
-
 def _gen_fish() -> str:
-    lines = ["# fish completion for onomedit", "# 生成: onomedit completion fish", "# 安装到 ~/.config/fish/completions/onomedit.fish", ""]
+    lines = [
+        "# fish completion for onomedit",
+        "# 生成: onomedit completion fish",
+        "# 安装到 ~/.config/fish/completions/onomedit.fish",
+        "",
+    ]
     for sub in SUBCOMMANDS:
         lines.append(f"complete -c onomedit -f -n '__fish_use_subcommand' -a '{sub}'")
     lines.append("")
-    lines.extend(_fish_sub("rename", ["--dry-run", "--no-editor", "--multi-tab", "--reverse"], {
-        "--path-type": "full name stem ext",
-        "--sort-by": "default name path mtime ctime size",
-        "--exclude": "f file d dir l link r readonly h hidden s system",
-        "--timeout": "",
-        "--depth": "",
-    }))
+    lines.extend(
+        _fish_sub(
+            "rename",
+            ["--dry-run", "--no-editor", "--multi-tab", "--reverse"],
+            {
+                "--path-type": "full name stem ext",
+                "--sort-by": "default name path mtime ctime size",
+                "--exclude": "f file d dir l link r readonly h hidden s system",
+                "--timeout": "",
+                "--depth": "",
+            },
+        )
+    )
     lines.extend(_fish_sub("restore", ["--all", "--partial"], {}))
     lines.extend(_fish_sub("history", ["--all"], {}))
     lines.extend(_fish_sub("config", [], {}))
-    lines.append("complete -c onomedit -f -n '__fish_seen_subcommand_from config' -a 'set set-editor reset'")
-    lines.append("complete -c onomedit -f -n '__fish_seen_subcommand_from completion' -a 'bash zsh pwsh fish psc'")
-    lines.append("complete -c onomedit -f -n '__fish_seen_subcommand_from help' -a 'completion config gui help history rename restore version'")
+    lines.append(
+        "complete -c onomedit -f -n '__fish_seen_subcommand_from config' -a 'set set-editor reset'"
+    )
+    lines.append(
+        "complete -c onomedit -f -n '__fish_seen_subcommand_from completion' -a 'bash zsh pwsh fish psc'"
+    )
+    lines.append(
+        "complete -c onomedit -f -n '__fish_seen_subcommand_from help' -a 'completion config gui help history rename restore version'"
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -343,9 +435,13 @@ def _fish_sub(sub: str, bools: list[str], value_flags: dict[str, str]) -> list[s
     for flag, vals in value_flags.items():
         name = flag[2:]
         if vals:
-            lines.append(f"complete -c onomedit -f -n '{cond}' -l {name} -x -a '{vals}' -d '{name}'")
+            lines.append(
+                f"complete -c onomedit -f -n '{cond}' -l {name} -x -a '{vals}' -d '{name}'"
+            )
         else:
-            lines.append(f"complete -c onomedit -f -n '{cond}' -l {name} -r -d '{name}'")
+            lines.append(
+                f"complete -c onomedit -f -n '{cond}' -l {name} -r -d '{name}'"
+            )
     lines.append("")
     return lines
 
@@ -370,13 +466,15 @@ def _ps_value_block(flag: str) -> str:
 def _gen_psc() -> str:
     """PSCompletions 自定义补全器：候选带中文 tip，注册为 -CommandName 普通补全。"""
     words = _sub_list()
-    subs = "\n".join(_ps_item(s, _SUB_TIPS[s]) for s in SUBCOMMANDS)
+    subs = "\n".join(_ps_item(s, tr(_SUB_TIPS[s])) for s in SUBCOMMANDS)
     rename_opts = "\n".join(
-        _ps_item(f, _FLAG_TIPS[f])
+        _ps_item(f, tr(_FLAG_TIPS[f]))
         for f in _BOOL_FLAGS["rename"] + _VALUE_FLAGS["rename"]
     )
     value = "\n".join(_ps_value_block(f) for f in _VALUE_TIPS)
-    shells = "\n".join(_ps_item(s, "生成 " + s + " 补全", indent=12) for s in supported_shells())
+    shells = "\n".join(
+        _ps_item(s, "生成 " + s + " 补全", indent=12) for s in supported_shells()
+    )
     return f"""# PSCompletions completion for onomedit
 # 生成: onomedit completion psc
 # 用法: 配合 PSCompletions 模块（候选带 tip 提示）。把本脚本存为独立文件后在

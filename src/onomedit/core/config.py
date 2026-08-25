@@ -10,8 +10,15 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
-from onomedit.core.pathitem import PATH_TYPES, PATH_TYPE_EXT, PATH_TYPE_FULL, PATH_TYPE_NAME, PATH_TYPE_STEM  # noqa: F401
+from onomedit.core.pathitem import (
+    PATH_TYPE_EXT,
+    PATH_TYPE_FULL,
+    PATH_TYPE_NAME,
+    PATH_TYPE_STEM,
+    PATH_TYPES,
+)  # noqa: F401
 from onomedit.core.rules import rule_from_dict, rule_to_dict
+from onomedit.i18n import SUPPORTED_LANGUAGES, ZH_CN, normalize_language, tr
 
 CONFIG_VERSION = 1
 
@@ -71,6 +78,8 @@ class SafetyOptions:
 @dataclass
 class Config:
     version: int = CONFIG_VERSION
+    # User-interface and CLI language (BCP-47 tag).
+    language: str = ZH_CN
     # 编辑器（主/备用）与等待
     editor: str = ""
     editor_alt: str = ""
@@ -187,12 +196,19 @@ def to_dict(cfg: Config) -> dict:
 def from_dict(data: dict) -> Config:
     """dict → Config，缺失键用默认值填充；未知键忽略。"""
     base = default_config()
-    flat = {config_field.name: getattr(base, config_field.name) for config_field in fields(base)}
+    flat = {
+        config_field.name: getattr(base, config_field.name)
+        for config_field in fields(base)
+    }
     flat.update({k: v for k, v in data.items() if k in flat})
     for key in ("exclude", "preview", "safety"):
         sub = flat.get(key)
         if isinstance(sub, dict):
-            cls = {"exclude": ExcludeOptions, "preview": PreviewOptions, "safety": SafetyOptions}[key]
+            cls = {
+                "exclude": ExcludeOptions,
+                "preview": PreviewOptions,
+                "safety": SafetyOptions,
+            }[key]
             defaults = cls()
             merged = {f: sub.get(f, getattr(defaults, f)) for f in defaults.__dict__}
             flat[key] = cls(**merged)
@@ -203,6 +219,7 @@ def from_dict(data: dict) -> Config:
         except (KeyError, ValueError, TypeError):
             continue
     flat["auto_rules"] = rules
+    flat["language"] = normalize_language(flat.get("language"))
     return Config(**flat)
 
 
@@ -244,7 +261,9 @@ def save_config(cfg: Config) -> None:
     path = config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(to_dict(cfg), ensure_ascii=False, indent=2), encoding="utf-8")
+    tmp.write_text(
+        json.dumps(to_dict(cfg), ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     os.replace(tmp, path)
 
 
@@ -264,7 +283,7 @@ def _coerce(raw: str, current) -> object:
             return True
         if low in ("false", "0", "no", "off"):
             return False
-        raise ValueError("需要布尔值（true/false/1/0）")
+        raise ValueError(tr("需要布尔值（true/false/1/0）"))
     if isinstance(current, int):
         return int(raw.strip())
     if isinstance(current, float):
@@ -302,6 +321,15 @@ def set_value(cfg: Config, dotted_path: str, raw: str) -> str:
     except (AttributeError, KeyError):
         raise KeyError(dotted_path) from None
     value = _coerce(raw, current)
+    if dotted_path == "language":
+        normalized = normalize_language(str(value))
+        accepted = {"zh", "zh-cn", "zh-hans", "en", "en-us"}
+        if str(value).strip().replace("_", "-").lower() not in accepted:
+            raise ValueError(
+                f"unsupported language {value!r}; choose from: "
+                f"{', '.join(SUPPORTED_LANGUAGES)}"
+            )
+        value = normalized
     # auto_rules 走规则反序列化
     if dotted_path == "auto_rules" and isinstance(value, list):
         value = [rule_from_dict(item) for item in value]

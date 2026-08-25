@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import os
 
+from onomedit.i18n import tr
+
 PATH_TYPE_FULL = "full"
 PATH_TYPE_NAME = "name"
 PATH_TYPE_STEM = "stem"
@@ -41,7 +43,7 @@ class PathItem:
 
     def get_field(self, scope: str) -> str:
         if scope not in PATH_TYPES:
-            raise ValueError(f"未知路径类型: {scope}")
+            raise ValueError(tr("未知路径类型: {scope}", scope=scope))
         return getattr(self, scope)
 
     def with_field(self, scope: str, value: str) -> str:
@@ -58,7 +60,7 @@ class PathItem:
             return self._join(parent, value + self.ext)
         if scope == "ext":
             return self._join(parent, self.stem + value)
-        raise ValueError(f"未知路径类型: {scope}")
+        raise ValueError(tr("未知路径类型: {scope}", scope=scope))
 
     @staticmethod
     def _join(parent: str, value: str) -> str:

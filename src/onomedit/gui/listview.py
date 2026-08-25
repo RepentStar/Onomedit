@@ -6,12 +6,12 @@ from __future__ import annotations
 
 import os
 import tkinter as tk
-from tkinter import messagebox
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from onomedit.core import config as config_mod
 from onomedit.core.logger import RenameLogger
 from onomedit.core.pipeline import DuplicateTargetError, Renamer, diff_text, levenshtein
+from onomedit.i18n import set_language, tr
 
 
 class ListWindow(tk.Toplevel):
@@ -30,10 +30,11 @@ class ListWindow(tk.Toplevel):
         base: str = "",
     ):
         super().__init__(master)
-        self.title("Onomedit - 重命名确认")
         self.geometry("900x560")
         self.pairs = pairs
         self.cfg = cfg or config_mod.load_config()
+        set_language(self.cfg.language)
+        self.title(tr("Onomedit - 重命名确认"))
         self.on_done = on_done
         self.on_cancel = on_cancel
         self.base = base  # 显示基准目录（空 = 显示完整路径）
@@ -48,15 +49,17 @@ class ListWindow(tk.Toplevel):
     def _build(self) -> None:
         # 列按配置动态生成：差异/距离关闭时直接不显示该列
         cols: list[str] = ["old", "new"]
-        headers: list[str] = ["原文件名", "新文件名"]
+        headers: list[str] = [tr("原文件名"), tr("新文件名")]
         if self.cfg.preview.diff:
             cols.append("diff")
-            headers.append("差异")
+            headers.append(tr("差异"))
         if self.cfg.preview.distance:
             cols.append("distance")
-            headers.append("距离")
+            headers.append(tr("距离"))
 
-        self.tree = ttk.Treeview(self, columns=cols, show="headings", selectmode="extended")
+        self.tree = ttk.Treeview(
+            self, columns=cols, show="headings", selectmode="extended"
+        )
         tree = self.tree
         for col, head in zip(cols, headers):
             tree.heading(col, text=head)
@@ -79,12 +82,22 @@ class ListWindow(tk.Toplevel):
 
         btns = ttk.Frame(self)
         btns.pack(side="bottom", fill="x", pady=6)
-        ttk.Button(btns, text="全选", command=lambda: self._select_all(True)).pack(side="left", padx=4)
-        ttk.Button(btns, text="全不选", command=lambda: self._select_all(False)).pack(side="left", padx=4)
-        ttk.Button(btns, text="执行重命名", command=self._execute).pack(side="right", padx=4)
-        ttk.Button(btns, text="取消", command=self._on_close).pack(side="right", padx=4)
+        ttk.Button(btns, text=tr("全选"), command=lambda: self._select_all(True)).pack(
+            side="left", padx=4
+        )
+        ttk.Button(
+            btns, text=tr("全不选"), command=lambda: self._select_all(False)
+        ).pack(side="left", padx=4)
+        ttk.Button(btns, text=tr("执行重命名"), command=self._execute).pack(
+            side="right", padx=4
+        )
+        ttk.Button(btns, text=tr("取消"), command=self._on_close).pack(
+            side="right", padx=4
+        )
 
-        self._status = ttk.Label(self, text=f"共 {len(self.pairs)} 项（已全选）")
+        self._status = ttk.Label(
+            self, text=tr("共 {count} 项（已全选）", count=len(self.pairs))
+        )
         self._status.pack(side="bottom", fill="x", padx=8)
 
         # 双击行切换选中（勾选语义）
@@ -133,7 +146,7 @@ class ListWindow(tk.Toplevel):
     def _execute(self) -> None:
         indexes = self._selected()
         if not indexes:
-            self._status.configure(text="未勾选任何项目")
+            self._status.configure(text=tr("未勾选任何项目"))
             return
         pairs = [self.pairs[i] for i in indexes]
         log = RenameLogger(config_mod.log_dir())
@@ -143,12 +156,14 @@ class ListWindow(tk.Toplevel):
         except DuplicateTargetError as e:
             # 勾选的项目中出现目标重名 → 警告并中止，不执行
             self._status.configure(text=e.summary)
-            messagebox.showwarning("目标重名，已中止", str(e), parent=self)
+            messagebox.showwarning(tr("目标重名，已中止"), str(e), parent=self)
             return
         self._executed = True
-        text = (
-            f"完成: 成功 {len(result.success)} / 失败 {len(result.failed)}"
-            f" / 无变化 {len(result.skipped)}"
+        text = tr(
+            "完成: 成功 {success} / 失败 {failed} / 无变化 {skipped}",
+            success=len(result.success),
+            failed=len(result.failed),
+            skipped=len(result.skipped),
         )
         self._status.configure(text=text)
         if self.on_done:

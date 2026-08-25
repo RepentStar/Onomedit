@@ -8,18 +8,24 @@ import os
 import tempfile
 from pathlib import Path
 
+from onomedit.i18n import tr
+
 
 class LineCountError(ValueError):
     """临时文件行数与文件数不一致。"""
 
 
-def write_items(items, path_type: str, temp_dir: str | os.PathLike | None = None) -> tuple[Path, list[str]]:
+def write_items(
+    items, path_type: str, temp_dir: str | os.PathLike | None = None
+) -> tuple[Path, list[str]]:
     """把路径对象序列化写入 UTF-8 临时文件。
 
     返回 (临时文件路径, 原始行列表)。每项一行，尾部换行。
     """
     lines = [it.serialize(path_type) for it in items]
-    fd, path = tempfile.mkstemp(prefix="onomedit_", suffix=".txt", dir=temp_dir, text=True)
+    fd, path = tempfile.mkstemp(
+        prefix="onomedit_", suffix=".txt", dir=temp_dir, text=True
+    )
     try:
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
             for line in lines:
@@ -39,7 +45,11 @@ def read_lines(path: str | os.PathLike, expected_count: int) -> list[str]:
         lines = f.read().splitlines()
     if len(lines) != expected_count:
         raise LineCountError(
-            f"临时文件行数 {len(lines)} 与文件数 {expected_count} 不一致，已中止（防止错位改名）"
+            tr(
+                "临时文件行数 {actual} 与文件数 {expected} 不一致，已中止（防止错位改名）",
+                actual=len(lines),
+                expected=expected_count,
+            )
         )
     return lines
 

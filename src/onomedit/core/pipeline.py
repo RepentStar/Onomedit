@@ -7,9 +7,19 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from onomedit.core import collection, config as config_mod, editor, envvars, rules, tempfile_mgr
+from onomedit.core import (
+    collection,
+    editor,
+    envvars,
+    rules,
+    tempfile_mgr,
+)
+from onomedit.core import (
+    config as config_mod,
+)
 from onomedit.core.logger import RenameLogger, parse_line
 from onomedit.core.pathitem import PathItem, rename_ensure_parent
+from onomedit.i18n import tr
 from onomedit.utils import safename
 
 
@@ -23,9 +33,9 @@ class DuplicateTargetError(PipelineError):
     def __init__(self, conflicts: list[tuple[str, list[str]]]):
         self.conflicts = conflicts
         # 每组冲突：目标单独一行、每个源文件各占一行，避免长路径挤在同一行
-        lines = ["检测到目标重名，已中止（未执行任何重命名）:"]
+        lines = [tr("检测到目标重名，已中止（未执行任何重命名）:")]
         for new, olds in conflicts:
-            lines.append(f"  目标: {new}")
+            lines.append(tr("  目标: {target}", target=new))
             for old in olds:
                 lines.append(f"    <- {old}")
         super().__init__("\n".join(lines))
@@ -35,7 +45,11 @@ class DuplicateTargetError(PipelineError):
         """状态栏用的一句话摘要。"""
         groups = len(self.conflicts)
         involved = sum(len(olds) for _, olds in self.conflicts)
-        return f"检测到目标重名，已中止（未执行任何重命名）: {groups} 组目标、涉及 {involved} 个文件"
+        return tr(
+            "检测到目标重名，已中止（未执行任何重命名）: {groups} 组目标、涉及 {files} 个文件",
+            groups=groups,
+            files=involved,
+        )
 
 
 def find_duplicate_targets(pairs: list[tuple[str, str]]) -> list[tuple[str, list[str]]]:
@@ -62,7 +76,9 @@ class RenameResult:
     """批量重命名结果：成功 / 失败 / 无变化（跳过）。"""
 
     success: list[tuple[str, str]] = field(default_factory=list)
-    failed: list[tuple[str, str, str]] = field(default_factory=list)  # (old, new, error)
+    failed: list[tuple[str, str, str]] = field(
+        default_factory=list
+    )  # (old, new, error)
     skipped: list[str] = field(default_factory=list)  # 目标与源相同，无变化
 
     @property
@@ -206,7 +222,12 @@ class Renamer:
             self.log.record_error(message)
 
 
-def restore(logger: RenameLogger, *, all_history: bool = False, partial_lines: list[str] | None = None) -> RenameResult:
+def restore(
+    logger: RenameLogger,
+    *,
+    all_history: bool = False,
+    partial_lines: list[str] | None = None,
+) -> RenameResult:
     """恢复流程：反向执行（新 → 旧），倒序避免改名链依赖冲突。"""
     if partial_lines is not None:
         pairs = [parse_line(line) for line in partial_lines]
@@ -224,20 +245,31 @@ def restore(logger: RenameLogger, *, all_history: bool = False, partial_lines: l
 class RenamePipeline:
     """主流程编排。所有阶段可被调用方注入（测试/多实例隔离）。"""
 
-    def __init__(self, cfg=None, *, temp_dir=None, on_status=None, clipboard_text: str | None = None):
+    def __init__(
+        self,
+        cfg=None,
+        *,
+        temp_dir=None,
+        on_status=None,
+        clipboard_text: str | None = None,
+    ):
         self.cfg = cfg or config_mod.load_config()
         self.temp_dir = temp_dir or (self.cfg.temp_dir or None)
         self.on_status = on_status or (lambda msg: None)
         self.clipboard_text = clipboard_text
 
-    def prepare(self, raw_paths: list[str] | None = None) -> tuple[list[PathItem], list[str], str]:
+    def prepare(
+        self, raw_paths: list[str] | None = None
+    ) -> tuple[list[PathItem], list[str], str]:
         """流程前半：收集 → 展开 → 过滤 → 写临时文件 → 等待编辑 → 读回。
 
         返回 (items, new_full 列表, 临时文件路径)。行数校验失败抛 LineCountError。
         """
-        paths = collection.collect_paths(raw_paths, use_clipboard=self.clipboard_text is None)
+        paths = collection.collect_paths(
+            raw_paths, use_clipboard=self.clipboard_text is None
+        )
         if not paths:
-            raise PipelineError("没有可处理的文件（路径不存在或剪贴板为空）")
+            raise PipelineError(tr("没有可处理的文件（路径不存在或剪贴板为空）"))
         items = collection.build_items(paths)
         if self.cfg.expand_subdirs:
             items = collection.expand_subdirs(items, self.cfg.subdirs_depth)
@@ -249,20 +281,27 @@ class RenamePipeline:
             items, self.cfg.sort_by, reverse=self.cfg.sort_reverse
         )
         if not items:
-            raise PipelineError("应用排除规则后没有可处理的文件")
+            raise PipelineError(tr("应用排除规则后没有可处理的文件"))
 
-        temp_path, _ = tempfile_mgr.write_items(items, self.cfg.path_type, temp_dir=self.temp_dir)
+        temp_path, _ = tempfile_mgr.write_items(
+            items, self.cfg.path_type, temp_dir=self.temp_dir
+        )
         sig = tempfile_mgr.signature(temp_path)
 
         if self.cfg.open_editor:
             editor_cmd = self.cfg.editor
             if not editor_cmd.strip():
                 raise PipelineError(
-                    "未配置编辑器，请先运行: onomedit config set-editor <命令>\n"
-                    "（或使用 --no-editor 跳过编辑器）"
+                    tr(
+                        "未配置编辑器，请先运行: onomedit config set-editor <命令>\n"
+                        "（或使用 --no-editor 跳过编辑器）"
+                    )
                 )
             self.on_status(
-                f"已写入临时文件: {temp_path}\n请在编辑器中修改后保存并退出…"
+                tr(
+                    "已写入临时文件: {path}\n请在编辑器中修改后保存并退出…",
+                    path=temp_path,
+                )
             )
             editor.launch_and_wait(
                 editor_cmd,
@@ -273,11 +312,18 @@ class RenamePipeline:
                 on_status=self.on_status,
             )
 
-        lines = tempfile_mgr.read_lines(temp_path, len(items))  # 行数校验，不一致抛 LineCountError
-        new_fulls = [item.with_field(self.cfg.path_type, line) for item, line in zip(items, lines)]
+        lines = tempfile_mgr.read_lines(
+            temp_path, len(items)
+        )  # 行数校验，不一致抛 LineCountError
+        new_fulls = [
+            item.with_field(self.cfg.path_type, line)
+            for item, line in zip(items, lines)
+        ]
         return items, new_fulls, temp_path
 
-    def plan(self, items: list[PathItem], new_fulls: list[str]) -> list[tuple[str, str]]:
+    def plan(
+        self, items: list[PathItem], new_fulls: list[str]
+    ) -> list[tuple[str, str]]:
         """应用规则（顺序固定）+ 环境变量展开 + 安全命名，生成 (old, new) 计划对。
 
         规则顺序：替换/转换/插入（按配置列表顺序）→ 环境变量展开 → 安全命名。
@@ -296,7 +342,9 @@ class RenamePipeline:
                 if self.cfg.enable_envvars:
                     # 环境变量作用于 name 段（目录段保持原样）
                     pi = PathItem(full)
-                    ctx = envvars.EnvContext(file=item.full, clip_text=self.clipboard_text)
+                    ctx = envvars.EnvContext(
+                        file=item.full, clip_text=self.clipboard_text
+                    )
                     new_name = env.expand(pi.name, context=ctx)
                     full = os.path.join(pi.directory, new_name)
             if self.cfg.safety.sanitize:
@@ -342,7 +390,9 @@ class RenamePipeline:
             pass
 
 
-def preview_rows(items: list[PathItem], pairs: list[tuple[str, str]], cfg) -> list[PreviewRow]:
+def preview_rows(
+    items: list[PathItem], pairs: list[tuple[str, str]], cfg
+) -> list[PreviewRow]:
     """生成列表窗口/预览所需行（差异 / 距离按配置开关）。"""
     rows: list[PreviewRow] = []
     for item, (old, new) in zip(items, pairs):

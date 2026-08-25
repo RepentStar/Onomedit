@@ -9,10 +9,10 @@ from __future__ import annotations
 import os
 import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox
-from tkinter import ttk
+from tkinter import filedialog, messagebox, ttk
 
-from onomedit.core import collection, config as config_mod
+from onomedit.core import collection
+from onomedit.core import config as config_mod
 from onomedit.core.collection import display_base
 from onomedit.core.logger import RenameLogger
 from onomedit.core.pathitem import PathItem
@@ -25,26 +25,28 @@ from onomedit.core.pipeline import (
 )
 from onomedit.gui.listview import ListWindow
 from onomedit.gui.settings import SettingsWindow
+from onomedit.i18n import set_language, tr
 
 
 class MainWindow:
     def __init__(self, root: tk.Tk, cfg: config_mod.Config | None = None):
         self.root = root
         self.cfg = cfg or config_mod.load_config()
+        set_language(self.cfg.language)
         self.paths: list[str] = []  # 用户添加的原始路径（不展开）
         self._busy = False
         self._build()
         self._setup_dnd()
 
     def _build(self) -> None:
-        self.root.title("Onomedit - 批量重命名")
+        self.root.title(tr("Onomedit - 批量重命名"))
         self.root.geometry("780x560")
 
         main = ttk.Frame(self.root, padding=10)
         main.pack(fill="both", expand=True)
 
         list_frame = ttk.LabelFrame(
-            main, text="文件（将按此顺序写入临时文件）", padding=6
+            main, text=tr("文件（将按此顺序写入临时文件）"), padding=6
         )
         list_frame.pack(fill="both", expand=True)
 
@@ -56,26 +58,26 @@ class MainWindow:
 
         btns = ttk.Frame(main)
         btns.pack(fill="x", pady=(8, 4))
-        ttk.Button(btns, text="添加文件…", command=self._pick_files).pack(
+        ttk.Button(btns, text=tr("添加文件…"), command=self._pick_files).pack(
             side="left", padx=2
         )
-        ttk.Button(btns, text="添加文件夹…", command=self._pick_dir).pack(
+        ttk.Button(btns, text=tr("添加文件夹…"), command=self._pick_dir).pack(
             side="left", padx=2
         )
-        ttk.Button(btns, text="从剪贴板", command=self._from_clipboard).pack(
+        ttk.Button(btns, text=tr("从剪贴板"), command=self._from_clipboard).pack(
             side="left", padx=2
         )
-        ttk.Button(btns, text="清空", command=self._clear).pack(side="left", padx=2)
-        ttk.Button(btns, text="设置…", command=self._open_settings).pack(
+        ttk.Button(btns, text=tr("清空"), command=self._clear).pack(side="left", padx=2)
+        ttk.Button(btns, text=tr("设置…"), command=self._open_settings).pack(
             side="right", padx=2
         )
-        ttk.Button(btns, text="恢复上次", command=self._restore_last).pack(
+        ttk.Button(btns, text=tr("恢复上次"), command=self._restore_last).pack(
             side="right", padx=2
         )
 
         opts = ttk.Frame(main)
         opts.pack(fill="x", pady=4)
-        ttk.Label(opts, text="路径类型:").pack(side="left")
+        ttk.Label(opts, text=tr("路径类型:")).pack(side="left")
         self.path_type_var = tk.StringVar(value=self.cfg.path_type)
         ttk.Combobox(
             opts,
@@ -86,9 +88,12 @@ class MainWindow:
         ).pack(side="left", padx=4)
         self.subdirs_var = tk.BooleanVar(value=self.cfg.expand_subdirs)
         ttk.Checkbutton(
-            opts, text="展开子文件夹", variable=self.subdirs_var, command=self._refresh
+            opts,
+            text=tr("展开子文件夹"),
+            variable=self.subdirs_var,
+            command=self._refresh,
         ).pack(side="left", padx=6)
-        ttk.Label(opts, text="层级:").pack(side="left")
+        ttk.Label(opts, text=tr("层级:")).pack(side="left")
         self.depth_var = tk.IntVar(value=self.cfg.subdirs_depth)
         self.depth_spin = ttk.Spinbox(
             opts,
@@ -102,21 +107,21 @@ class MainWindow:
 
         run_frame = ttk.Frame(main)
         run_frame.pack(fill="x", pady=(4, 0))
-        ttk.Button(run_frame, text="开始（打开编辑器）", command=self._start).pack(
+        ttk.Button(run_frame, text=tr("开始（打开编辑器）"), command=self._start).pack(
             side="left"
         )
         ttk.Button(
             run_frame,
-            text="直接应用规则（跳过编辑器）",
+            text=tr("直接应用规则（跳过编辑器）"),
             command=lambda: self._start(no_editor=True),
         ).pack(side="left", padx=6)
         ttk.Button(
             run_frame,
-            text="预览（进入重命名确认）",
+            text=tr("预览（进入重命名确认）"),
             command=lambda: self._start(dry_run=True),
         ).pack(side="left")
 
-        self._status = ttk.Label(main, text="就绪", anchor="w")
+        self._status = ttk.Label(main, text=tr("就绪"), anchor="w")
         self._status.pack(fill="x", pady=(6, 0))
 
     def _setup_dnd(self) -> None:
@@ -131,14 +136,14 @@ class MainWindow:
             self.listbox.drop_target_register("DND_Files")
             self.listbox.dnd_bind("<<Drop>>", self._on_drop)
         except Exception as e:  # noqa: BLE001 - 可选能力
-            self._status.configure(text=f"就绪（拖拽不可用: {e}）")
+            self._status.configure(text=tr("就绪（拖拽不可用: {error}）", error=e))
 
     def _pick_files(self) -> None:
-        chosen = filedialog.askopenfilenames(parent=self.root, title="选择文件")
+        chosen = filedialog.askopenfilenames(parent=self.root, title=tr("选择文件"))
         self._add_paths(list(chosen))
 
     def _pick_dir(self) -> None:
-        chosen = filedialog.askdirectory(parent=self.root, title="选择文件夹")
+        chosen = filedialog.askdirectory(parent=self.root, title=tr("选择文件夹"))
         if chosen:
             self._add_paths([chosen])
 
@@ -147,7 +152,7 @@ class MainWindow:
 
         paths = clipboard.get_paths()
         if not paths:
-            self._status.configure(text="剪贴板为空或不可读")
+            self._status.configure(text=tr("剪贴板为空或不可读"))
             return
         self._add_paths(paths)
 
@@ -164,12 +169,16 @@ class MainWindow:
                 existing.add(p)
                 added += 1
         self._refresh()
-        self._status.configure(text=f"已添加 {added} 项，共 {len(self.paths)} 项")
+        self._status.configure(
+            text=tr(
+                "已添加 {added} 项，共 {total} 项", added=added, total=len(self.paths)
+            )
+        )
 
     def _clear(self) -> None:
         self.paths = []
         self._refresh()
-        self._status.configure(text="已清空")
+        self._status.configure(text=tr("已清空"))
 
     def _refresh(self) -> None:
         """按「展开子文件夹」勾选与层级刷新列表显示，并应用配置的排序。
@@ -201,7 +210,7 @@ class MainWindow:
             return
         paths = list(self.listbox.get(0, "end"))
         if not paths:
-            self._status.configure(text="请先添加文件")
+            self._status.configure(text=tr("请先添加文件"))
             return
         cfg = config_mod.load_config()
         cfg.path_type = self.path_type_var.get()
@@ -212,7 +221,7 @@ class MainWindow:
             cfg.open_editor = False
 
         self._busy = True
-        self._status.configure(text="后台线程：准备文件并等待编辑器…")
+        self._status.configure(text=tr("后台线程：准备文件并等待编辑器…"))
         self.root.configure(cursor="watch")
 
         def worker() -> None:
@@ -255,12 +264,12 @@ class MainWindow:
         if isinstance(exc, DuplicateTargetError):
             self._warn_duplicate_targets(exc)
         else:
-            self._status.configure(text=f"出错: {exc}")
+            self._status.configure(text=tr("出错: {error}", error=exc))
 
     def _warn_duplicate_targets(self, exc: DuplicateTargetError) -> None:
         """目标重名警告：状态栏摘要 + 弹窗详情（路径分行展示，可读性好）。"""
         self._status.configure(text=exc.summary)
-        messagebox.showwarning("目标重名，已中止", str(exc), parent=self.root)
+        messagebox.showwarning(tr("目标重名，已中止"), str(exc), parent=self.root)
 
     def _show_list(
         self, pairs, base: str, *, dry_run: bool, skip_confirmation: bool = False
@@ -268,7 +277,9 @@ class MainWindow:
         self._busy = False
         self.root.configure(cursor="")
         if dry_run:
-            self._status.configure(text=f"预览共 {len(pairs)} 项（未执行）")
+            self._status.configure(
+                text=tr("预览共 {count} 项（未执行）", count=len(pairs))
+            )
         if not dry_run and skip_confirmation:
             # 跳过确认模式：编辑保存后直接执行
             log = RenameLogger(config_mod.log_dir())
@@ -280,8 +291,12 @@ class MainWindow:
                 self._warn_duplicate_targets(e)
                 return
             self._status.configure(
-                text=f"重命名完成: 成功 {len(result.success)} / 失败 {len(result.failed)}"
-                f" / 无变化 {len(result.skipped)}"
+                text=tr(
+                    "重命名完成: 成功 {success} / 失败 {failed} / 无变化 {skipped}",
+                    success=len(result.success),
+                    failed=len(result.failed),
+                    skipped=len(result.skipped),
+                )
             )
             self._maybe_exit_after()
             return
@@ -292,15 +307,19 @@ class MainWindow:
             base=base,
             on_done=lambda r: self._ui(lambda: self._on_rename_done(r)),
             on_cancel=lambda: self._ui(
-                lambda: self._status.configure(text="重命名确认已取消")
+                lambda: self._status.configure(text=tr("重命名确认已取消"))
             ),
         )
 
     def _on_rename_done(self, result) -> None:
         """确认窗口执行完成后的处理（状态栏 + 完成后退出）。"""
         self._status.configure(
-            text=f"重命名完成: 成功 {len(result.success)} / 失败 {len(result.failed)}"
-            f" / 无变化 {len(result.skipped)}"
+            text=tr(
+                "重命名完成: 成功 {success} / 失败 {failed} / 无变化 {skipped}",
+                success=len(result.success),
+                failed=len(result.failed),
+                skipped=len(result.skipped),
+            )
         )
         self._maybe_exit_after()
 
@@ -317,7 +336,12 @@ class MainWindow:
             self._warn_duplicate_targets(e)
             return
         self._status.configure(
-            text=f"恢复完成: 成功 {len(result.success)} / 失败 {len(result.failed)} / 无变化 {len(result.skipped)}"
+            text=tr(
+                "恢复完成: 成功 {success} / 失败 {failed} / 无变化 {skipped}",
+                success=len(result.success),
+                failed=len(result.failed),
+                skipped=len(result.skipped),
+            )
         )
 
     def _open_settings(self) -> None:

@@ -18,6 +18,7 @@ import threading
 import time
 
 from onomedit.core import tempfile_mgr
+from onomedit.i18n import tr
 
 # 快速退出经验阈值（秒）：更短且文件未改 → 判定启动器型
 QUICK_EXIT_SECONDS = 2.0
@@ -36,7 +37,9 @@ class EditorError(RuntimeError):
 def split_command(cmd: str) -> list[str]:
     """解析编辑器命令字符串为参数列表（支持带引号的路径）。"""
     if not cmd.strip():
-        raise EditorError("编辑器命令为空，请先配置（config set-editor / config set editor）")
+        raise EditorError(
+            tr("编辑器命令为空，请先配置（config set-editor / config set editor）")
+        )
     if os.name == "nt":
         # shlex 的非 POSIX 模式会保留每个 token 的外层引号；传给
         # CreateProcess 的参数列表前必须去掉，否则带空格的路径无法解析，
@@ -64,7 +67,10 @@ def _resolve_command(args: list[str]) -> tuple[str, bool]:
     exe = shutil.which(first)
     if exe is None:
         raise EditorError(
-            f"找不到可执行文件 {first!r}，请检查 PATH 或配置编辑器完整路径"
+            tr(
+                "找不到可执行文件 {executable}，请检查 PATH 或配置编辑器完整路径",
+                executable=repr(first),
+            )
         )
     return exe, exe.lower().endswith((".cmd", ".bat"))
 
@@ -97,7 +103,9 @@ def launch_and_wait(
         else:
             proc = subprocess.Popen(cmd_args)
     except OSError as e:
-        raise EditorError(f"无法启动编辑器 {editor_cmd!r}: {e}") from e
+        raise EditorError(
+            tr("无法启动编辑器 {command}: {error}", command=repr(editor_cmd), error=e)
+        ) from e
 
     # 后台线程把焦点转到编辑器主窗口（GUI 点击「开始」后的体验）
     threading.Thread(target=_focus_editor_window, args=(proc.pid,), daemon=True).start()
@@ -107,7 +115,7 @@ def launch_and_wait(
 
     if multi_tab:
         # 多标签型：不依赖进程退出，直接轮询等保存
-        status("编辑器已启动（多标签模式），等待文件保存…")
+        status(tr("编辑器已启动（多标签模式），等待文件保存…"))
         _poll_save(temp_path, sig, timeout, status)
         return
 
@@ -118,11 +126,16 @@ def launch_and_wait(
                 sig, tempfile_mgr.signature(temp_path)
             ):
                 # 快速退出且文件未修改 → 启动器型：轮询等待用户保存
-                status("检测到启动器型编辑器，等待文件保存（超时后放弃）…")
+                status(tr("检测到启动器型编辑器，等待文件保存（超时后放弃）…"))
                 _poll_save(temp_path, sig, timeout, status)
             return  # 文件已保存或进程存活较久后退出 → 正常继续
         if time.monotonic() - start > timeout:
-            status(f"等待编辑器超时（{timeout:.0f}s），按当前内容继续")
+            status(
+                tr(
+                    "等待编辑器超时（{timeout}s），按当前内容继续",
+                    timeout=f"{timeout:.0f}",
+                )
+            )
             return
         time.sleep(PROCESS_POLL_INTERVAL)
 
@@ -134,7 +147,7 @@ def _poll_save(temp_path, sig, timeout: float, status) -> None:
         if tempfile_mgr.changed(sig, tempfile_mgr.signature(temp_path)):
             return
         time.sleep(POLL_INTERVAL)
-    status("等待保存超时，继续处理")
+    status(tr("等待保存超时，继续处理"))
 
 
 def _focus_editor_window(pid: int) -> None:
