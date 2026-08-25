@@ -13,6 +13,9 @@ Onomedit 是一个借助你熟悉的文本编辑器批量重命名文件和文�
 5. 重命名
 6. 写入可恢复日志
 
+> [!TIP]
+> 当前版本使用 Python 实现，[Onomeditpp](https://github.com/RepentStar/Onemeditpp)项目已经使用 Rust 完成重写，如需更高性能要求可以使用 Onomeditpp
+
 ## 主要功能
 
 - 同时支持命令行和图形界面；不带参数运行时默认打开 GUI。
