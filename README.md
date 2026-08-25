@@ -759,14 +759,15 @@ uv run python scripts/gui_smoke.py
 uv run python scripts/clipboard_check.py
 ```
 
-Windows 下用 Nuitka 生成完整版单文件程序：
+Windows 下用 Cargo 生成完整版和 CLI-only 发布程序：
 
 ```powershell
-uv sync --extra gui --extra dnd --extra img
-pwsh scripts/build_nuitka.ps1
+cargo build --locked --release --bin onomedit
+cargo build --locked --release --no-default-features --bin onomedit-cli
+pwsh scripts/e2e_release.ps1
 ```
 
-产物为 `dist\onomedit.exe`。入口是 `scripts/nuitka_entry.py`；推送 `v*` 标签后，GitHub Actions 会构建完整版和 CLI 精简版并发布到 Releases。
+产物为 `target\release\onomedit.exe` 和 `target\release\onomedit-cli.exe`。发布物 E2E 使用隔离配置目录且不依赖 Python；推送 `v*` 标签后，GitHub Actions 会构建、验证并发布这两个 Rust 程序。
 
 ## 许可证
 
