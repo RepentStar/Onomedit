@@ -270,7 +270,7 @@ Rust workspace 使用 `gui` feature 控制 GUI 依赖。当前 CI 仅运行 Wind
 - CLI 命令、配置与日志可与 v0.1.6 互操作；
 - 所有安全闸门在执行任何破坏性操作前生效；
 - 完整版 GUI 完成全部核心工作流，CLI-only 版不携带 GUI 依赖；
-- Windows 发布物通过 rename/history/restore/dry-run 的打包后 E2E；
+- Windows 发布物通过 rename/history/restore/dry-run 的本地隔离打包后 E2E；按当前决定，远端/干净 runner 和真实用户数据复核不作为切换门禁；
 - 发布文档说明 GUI 外观变化，但不要求用户迁移配置或日志；
 - Python 实现仅在上述条件满足后移除，不在差分验证完成前删除 oracle。
 

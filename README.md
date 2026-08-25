@@ -2,6 +2,8 @@
 
 Onomedit 是一个借助你熟悉的文本编辑器批量重命名文件和文件夹的工具，提供 CLI 和 GUI 两种使用方式。
 
+> `rust` 分支已经使用 Rust 实现应用、CLI 和 GUI。发布程序是原生 Windows 可执行文件，不需要安装 Python；仓库中的 Python 源码和测试目前只作为迁移期兼容性 oracle 保留。
+
 它会把待处理名称按“一行一个”写进临时文件，打开记事本、VS Code、Vim 等外部编辑器；你可以使用编辑器已有的多光标、列编辑、查找替换或宏，保存并退出后，Onomedit 再安全地执行重命名。
 
 工作流程：
@@ -23,7 +25,7 @@ Onomedit 是一个借助你熟悉的文本编辑器批量重命名文件和文�
 - 支持普通替换、忽略大小写替换、正则替换、大小写/全半角转换和首尾插入等自动规则。
 - 提供 dry-run 预览、非法名称清理、目标重名预检、占用目标自动编号、重命名链/环处理和编辑行数校验。
 - 每次成功改名都会记录日志，可恢复最近一次、全部历史或手工选择部分记录。
-- 核心 CLI 零第三方依赖；GUI 和拖拽按需安装。
+- 提供完整 GUI 和 CLI-only 两种原生程序；运行时无需 Python 或额外 GUI 依赖。
 
 ## 安装
 
@@ -32,36 +34,44 @@ Onomedit 是一个借助你熟悉的文本编辑器批量重命名文件和文�
 从 [GitHub Releases](https://github.com/RepentStar/Onomedit/releases) 下载：
 
 - `onomedit.exe`：完整版，包含 GUI、拖拽和 CLI。
-- `onomedit-cli.exe`：体积较小的纯 CLI 版；执行 `gui` 会提示缺少 GUI 依赖。
+- `onomedit-cli.exe`：体积较小的纯 CLI 版；执行 `gui` 会提示此构建未包含 GUI。
 
 双击完整版可以打开 GUI。若希望在任意终端使用 `onomedit`，可将程序放入一个已加入 `PATH` 的目录。
 
 ### 从源码运行
 
-项目基于 Python 3.11 开发，未测试更低版本兼容性。推荐使用 [uv](https://docs.astral.sh/uv/)：
+项目是 Cargo workspace，最低 Rust 版本为 1.85。当前发布和自动化验收以 Windows 为主；macOS/Linux 实现仍保留，但暂不作为发布门禁。
 
-```bash
-git clone https://github.com/RepentStar/Onomedit.git
+```powershell
+git clone --branch rust https://github.com/RepentStar/Onomedit.git
 cd Onomedit
 
-uv sync                                      # CLI、测试和构建环境
-uv sync --extra gui --extra dnd --extra img  # GUI、拖拽和图片能力
+# 完整版：包含 egui 图形界面和 CLI
+cargo build --locked -p onomedit --bin onomedit
+.\target\debug\onomedit.exe version
+.\target\debug\onomedit.exe gui
 
-# 仅 Windows 需要 Shell 扩展属性时再安装
-uv sync --extra win
-
-uv run onomedit version
-uv run onomedit gui
+# CLI-only：不编译或链接 GUI 依赖
+cargo build --locked -p onomedit --no-default-features --bin onomedit-cli
+.\target\debug\onomedit-cli.exe version
 ```
 
-从源码运行时，将命令替换为 `uv run onomedit` 即可。
+也可以直接通过 Cargo 运行；命令参数放在 `--` 后：
 
-| Extra | 依赖           | 用途                                         |
-| ----- | -------------- | -------------------------------------------- |
-| `gui` | `ttkbootstrap` | 图形界面                                     |
-| `dnd` | `tkinterdnd2`  | GUI 文件拖拽；未安装时仍可用按钮或剪贴板添加 |
-| `img` | `Pillow`       | 可选图片信息能力                             |
-| `win` | `pywin32`      | Windows Shell 扩展属性读取                   |
+```powershell
+cargo run -p onomedit --bin onomedit -- version
+cargo run -p onomedit --bin onomedit -- gui
+cargo run -p onomedit --no-default-features --bin onomedit-cli -- help rename
+```
+
+workspace 结构：
+
+| 目录 | 用途 |
+| --- | --- |
+| `crates/onomedit-core` | 路径、规则、收集、计划、执行、日志和恢复 |
+| `crates/onomedit-platform` | 剪贴板、文件属性和外部编辑器协议 |
+| `apps/onomedit` | CLI 分发、补全脚本和可选的 egui GUI |
+| `tests-rust/fixtures` | 共享兼容性和迁移快照 |
 
 ## 五分钟快速上手
 
@@ -123,9 +133,9 @@ onomedit
 
 1. 用“添加文件”“添加文件夹”“从剪贴板”或拖拽加入路径。
 2. 选择路径类型；需要处理目录内容时勾选“展开子文件夹”并设置层级。
-3. 点击“预览”进入确认窗口检查计划，或点击“开始（打开编辑器）”。
+3. 点击“开始（打开编辑器）”、无需编辑器的“直接应用规则”，或强制只读的“预览”。
 4. 在外部编辑器中保持一行对应一个项目，修改后保存并关闭。
-5. “预览”始终显示确认窗口，并允许继续执行选中项；普通“开始”则由 `skip_confirmation` 决定是否确认。
+5. “预览”只显示计划且不提供执行入口；普通“开始”由 `skip_confirmation` 决定直接执行还是进入可勾选的确认页。
 
 GUI 默认会跳过确认并在完成后退出。如果希望增加确认步骤并在结束一次重命名后仍保持打开状态则执行：
 
@@ -570,7 +580,7 @@ onomedit history --all    # 当前历史日志中的全部记录
 onomedit gui
 ```
 
-需要 `ttkbootstrap`；从源码运行 `uv sync --extra gui`。拖拽另需 `dnd` extra，缺少它不影响其他 GUI 功能。
+`onomedit.exe` 默认包含基于 egui 的 GUI 和原生拖拽支持；双击或不带参数运行也会打开 GUI。`onomedit-cli.exe` 不包含 GUI，执行此命令时会返回明确的不可用提示。
 
 ### `version`
 
@@ -664,7 +674,7 @@ onomedit completion psc > "$HOME\Documents\PowerShell\onomedit.psc.ps1"
 
 列表显示顺序就是写入编辑器的顺序。设置窗口改变排序后，主列表会刷新。
 
-“预览”不会自动改名，而是始终进入确认窗口；仍可在检查后点击“执行重命名”。确认窗口默认全选，支持全选、全不选、双击切换单行选择，并可按配置显示差异和编辑距离。路径会尽量相对于公共目录显示，但真正执行始终使用完整路径。全部成功后确认窗口自动关闭。
+“预览”是强制 dry-run：显示只读计划，不提供执行入口。普通流程在关闭 `skip_confirmation` 后进入确认页；确认项默认全选，可通过勾选框逐项选择，也支持全选、全不选，并可按配置显示差异和编辑距离。路径会尽量相对于公共目录显示，但真正执行始终使用完整路径。全部成功后确认页自动关闭。
 
 ## 安全机制与使用建议
 
@@ -742,24 +752,29 @@ onomedit config set exclude.hidden false
 
 ### GUI 无法启动或无法拖拽
 
-```bash
-uv sync --extra gui --extra dnd
+确认使用的是完整版 `onomedit.exe`，而不是 `onomedit-cli.exe`。从源码运行时不要关闭默认 feature：
+
+```powershell
+cargo run -p onomedit --bin onomedit -- gui
 ```
 
-只缺拖拽依赖时 GUI 仍可正常使用按钮和剪贴板。
+若程序可以启动但原生文件对话框、拖拽或编辑器聚焦异常，请记录 Windows 版本、编辑器命令和复现步骤。剪贴板及“添加文件/文件夹”按钮可作为输入替代方式。
 
 ## 开发与打包
 
-```bash
-uv sync
-uv run pytest
-uv run python scripts/smoke_test.py
-pwsh scripts/e2e_cli.ps1
-uv run python scripts/gui_smoke.py
-uv run python scripts/clipboard_check.py
+常规 Rust 门禁：
+
+```powershell
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --no-default-features --all-targets -- -D warnings
+cargo test --workspace
+cargo test --workspace --no-default-features
 ```
 
-Windows 下用 Cargo 生成完整版和 CLI-only 发布程序：
+迁移期间如需验证 Python oracle，可另外安装 uv 并运行 `uv run pytest`；这不是构建或运行 Rust 程序的前置条件。
+
+Windows release 构建及发布物 E2E：
 
 ```powershell
 cargo build --locked --release --bin onomedit

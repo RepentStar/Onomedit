@@ -157,11 +157,11 @@ GUI 可以改变布局，但不得复制一份核心算法；所有计划与执�
 - GitHub Actions 改为 Cargo release 构建，产出 `onomedit.exe` 和 `onomedit-cli.exe`。
 - 对打包后二进制运行 version/help/config/rename/dry-run/history/restore E2E。
 - 测量大目录收集、1 万项计划、长路径和大日志读取；优化不能改变稳定顺序。
-- 在真实 Python v0.1.6 配置和日志副本上做升级验证。
+- 使用已提交的 Python v0.1.6 代表性配置和日志快照做升级验证；真实用户数据复核不作为当前切换门禁。
 - 更新安装、开发和发布文档，说明 GUI 外观变化及配置无需迁移。
 - 达成所有门禁后，移除 Python 包、uv/Nuitka 构建与仅服务旧实现的依赖。
 
-退出门槛：发布产物在干净 Windows 环境无需 Python 即可运行；Windows CI 全绿；Windows 兼容矩阵签字确认；保留回滚到上一 Python release 的发布说明。macOS/Linux CI 与发布验收留待后续恢复。
+退出门槛：两个本地 Windows release 产物通过不调用 Python 的隔离 E2E；Windows 本地兼容矩阵签字确认；保留回滚到上一 Python release 的发布说明。按当前决定，远端 CI、干净 runner 和真实用户数据复核不作为切换门禁；macOS/Linux CI 与发布验收留待后续恢复。
 
 ## 4. 行为兼容矩阵
 
@@ -216,7 +216,7 @@ GUI 可以改变布局，但不得复制一份核心算法；所有计划与执�
 - [ ] 重复目标预检、真实冲突、链、环和部分失败兼容。
 - [ ] 编辑器快速退出、多标签、保存和超时状态机兼容。
 - [ ] GUI 核心流程完整，后台操作不冻结界面。
-- [ ] 完整版和 CLI-only 发布物在干净环境通过 E2E。
-- [ ] Windows 平台矩阵达到约定范围；macOS/Linux CI 与验收暂缓。
+- [ ] 完整版和 CLI-only release 发布物通过本地隔离 E2E，流程不调用 Python。
+- [ ] Windows 本地平台矩阵达到约定范围；远端及 macOS/Linux CI 与验收不作为当前门禁。
 - [ ] 达到全部门禁后才删除 Python oracle 和 Nuitka 构建。
 
