@@ -364,6 +364,159 @@
       "stderr_fnv1a64": "69d294a70741a4bb",
       "stderr_windows_len": 81,
       "stderr_windows_fnv1a64": "a72b756c4cead2e3"
+    },
+    {
+      "name": "help_extra",
+      "args": ["help", "rename", "extra"],
+      "exit_code": 2,
+      "stderr_len": 79,
+      "stderr_fnv1a64": "69d294a70741a4bb",
+      "stderr_windows_len": 81,
+      "stderr_windows_fnv1a64": "a72b756c4cead2e3"
+    },
+    {
+      "name": "config_action_invalid",
+      "args": ["config", "missing"],
+      "exit_code": 2,
+      "stderr_len": 148,
+      "stderr_fnv1a64": "04454e3d23215bd8",
+      "stderr_windows_len": 150,
+      "stderr_windows_fnv1a64": "e24342af2e05622e"
+    },
+    {
+      "name": "config_set_extra",
+      "args": ["config", "set", "editor", "code", "extra"],
+      "exit_code": 2,
+      "stderr_len": 79,
+      "stderr_fnv1a64": "69d294a70741a4bb",
+      "stderr_windows_len": 81,
+      "stderr_windows_fnv1a64": "a72b756c4cead2e3"
+    },
+    {
+      "name": "config_set_editor_missing",
+      "args": ["config", "set-editor"],
+      "exit_code": 2,
+      "stderr_len": 137,
+      "stderr_fnv1a64": "8733569e29f67086",
+      "stderr_windows_len": 139,
+      "stderr_windows_fnv1a64": "d58fe5e2561afbd0"
+    },
+    {
+      "name": "config_reset_extra",
+      "args": ["config", "reset", "extra"],
+      "exit_code": 2,
+      "stderr_len": 79,
+      "stderr_fnv1a64": "69d294a70741a4bb",
+      "stderr_windows_len": 81,
+      "stderr_windows_fnv1a64": "a72b756c4cead2e3"
+    },
+    {
+      "name": "completion_extra",
+      "args": ["completion", "bash", "extra"],
+      "exit_code": 2,
+      "stderr_len": 79,
+      "stderr_fnv1a64": "69d294a70741a4bb",
+      "stderr_windows_len": 81,
+      "stderr_windows_fnv1a64": "a72b756c4cead2e3"
+    },
+    {
+      "name": "rename_path_type_missing",
+      "args": ["rename", "a", "--path-type"],
+      "exit_code": 2,
+      "stderr_len": 358,
+      "stderr_fnv1a64": "38edfdca29b927a9",
+      "stderr_windows_len": 364,
+      "stderr_windows_fnv1a64": "45b005db7b91d003"
+    },
+    {
+      "name": "rename_timeout_missing",
+      "args": ["rename", "a", "--timeout"],
+      "exit_code": 2,
+      "stderr_len": 356,
+      "stderr_fnv1a64": "8cdc71ccffc0fd18",
+      "stderr_windows_len": 362,
+      "stderr_windows_fnv1a64": "0bab5dc1e6066f84"
+    },
+    {
+      "name": "rename_sort_missing",
+      "args": ["rename", "a", "--sort-by"],
+      "exit_code": 2,
+      "stderr_len": 356,
+      "stderr_fnv1a64": "5a76daddcf9bb461",
+      "stderr_windows_len": 362,
+      "stderr_windows_fnv1a64": "1061c141024bf3bb"
+    },
+    {
+      "name": "rename_depth_missing",
+      "args": ["rename", "a", "--depth"],
+      "exit_code": 2,
+      "stderr_len": 354,
+      "stderr_fnv1a64": "102267cce637768e",
+      "stderr_windows_len": 360,
+      "stderr_windows_fnv1a64": "9b692b122c4d8aee"
+    },
+    {
+      "name": "rename_exclude_missing",
+      "args": ["rename", "a", "--exclude"],
+      "exit_code": 2,
+      "stderr_len": 365,
+      "stderr_fnv1a64": "13eea176dfa0cd51",
+      "stderr_windows_len": 371,
+      "stderr_windows_fnv1a64": "4c62ec4721b927fd"
+    },
+    {
+      "name": "restore_extra",
+      "args": ["restore", "extra"],
+      "exit_code": 2,
+      "stderr_len": 79,
+      "stderr_fnv1a64": "69d294a70741a4bb",
+      "stderr_windows_len": 81,
+      "stderr_windows_fnv1a64": "a72b756c4cead2e3"
+    },
+    {
+      "name": "gui_extra",
+      "args": ["gui", "extra"],
+      "exit_code": 2,
+      "stderr_len": 79,
+      "stderr_fnv1a64": "69d294a70741a4bb",
+      "stderr_windows_len": 81,
+      "stderr_windows_fnv1a64": "a72b756c4cead2e3"
+    },
+    {
+      "name": "version_extra",
+      "args": ["version", "extra"],
+      "exit_code": 2,
+      "stderr_len": 79,
+      "stderr_fnv1a64": "69d294a70741a4bb",
+      "stderr_windows_len": 81,
+      "stderr_windows_fnv1a64": "a72b756c4cead2e3"
+    },
+    {
+      "name": "config_json_unclosed",
+      "args": ["config", "set", "auto_rules", "["],
+      "exit_code": 1,
+      "stderr_len": 50,
+      "stderr_fnv1a64": "5b87c34fda897c62",
+      "stderr_windows_len": 51,
+      "stderr_windows_fnv1a64": "111c4ab0578ff4eb"
+    },
+    {
+      "name": "config_json_trailing_comma",
+      "args": ["config", "set", "auto_rules", "[1,]"],
+      "exit_code": 1,
+      "stderr_len": 50,
+      "stderr_fnv1a64": "f4b356bf9bc2d536",
+      "stderr_windows_len": 51,
+      "stderr_windows_fnv1a64": "8f9bc595ac18e33f"
+    },
+    {
+      "name": "config_json_missing_value",
+      "args": ["config", "set", "shell_props", "{\"a\":}"],
+      "exit_code": 1,
+      "stderr_len": 50,
+      "stderr_fnv1a64": "fcbb006f79d54d2a",
+      "stderr_windows_len": 51,
+      "stderr_windows_fnv1a64": "46fddf6c05639d93"
     }
   ],
   "config_scenarios": [

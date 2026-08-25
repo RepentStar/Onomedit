@@ -193,7 +193,9 @@ pub fn entry(arguments: impl IntoIterator<Item = OsString>, gui_available: bool)
 
 const ROOT_USAGE: &str = "usage: onomedit <子命令> ...";
 const COMPLETION_USAGE: &str = "usage: onomedit completion {bash,zsh,pwsh,fish,psc}";
+const CONFIG_USAGE: &str = "usage: onomedit config <操作> ...";
 const CONFIG_SET_USAGE: &str = "usage: onomedit config set key value";
+const CONFIG_SET_EDITOR_USAGE: &str = "usage: onomedit config set-editor command [command ...]";
 const RENAME_USAGE: &str = "usage: onomedit rename [--dry-run] [--no-editor]\n                       [--path-type {full,name,stem,ext}] [--multi-tab]\n                       [--timeout TIMEOUT] [--sort-by KEY] [--reverse]\n                       [--depth N] [--exclude TYPE [TYPE ...]]\n                       [paths ...]";
 
 fn compatible_parse_error(arguments: &[OsString]) -> Option<String> {
@@ -227,17 +229,9 @@ fn compatible_parse_error(arguments: &[OsString]) -> Option<String> {
                 "{COMPLETION_USAGE}\nonomedit completion: error: argument shell: invalid choice: {} (choose from 'bash', 'zsh', 'pwsh', 'fish', 'psc')",
                 python_quote(shell)
             )),
-            _ => None,
+            _ => root_unrecognized(&args, 2),
         },
-        "config" if args.get(1).is_some_and(|action| action == "set") => match args.len() {
-            2 => Some(format!(
-                "{CONFIG_SET_USAGE}\nonomedit config set: error: the following arguments are required: key, value"
-            )),
-            3 => Some(format!(
-                "{CONFIG_SET_USAGE}\nonomedit config set: error: the following arguments are required: value"
-            )),
-            _ => None,
-        },
+        "config" => compatible_config_parse_error(&args),
         "rename" => compatible_rename_parse_error(&args),
         "history" if args.iter().skip(1).any(|argument| argument != "--all") => {
             let unexpected = args
@@ -251,8 +245,57 @@ fn compatible_parse_error(arguments: &[OsString]) -> Option<String> {
                 "{ROOT_USAGE}\nonomedit: error: unrecognized arguments: {unexpected}"
             ))
         }
+        "help" => root_unrecognized(&args, 2),
+        "restore" => {
+            let unexpected = args
+                .iter()
+                .skip(1)
+                .filter(|argument| !matches!(argument.as_str(), "--all" | "--partial"))
+                .cloned()
+                .collect::<Vec<_>>();
+            (!unexpected.is_empty()).then(|| {
+                format!(
+                    "{ROOT_USAGE}\nonomedit: error: unrecognized arguments: {}",
+                    unexpected.join(" ")
+                )
+            })
+        }
+        "gui" | "version" => root_unrecognized(&args, 1),
         _ => None,
     }
+}
+
+fn compatible_config_parse_error(args: &[String]) -> Option<String> {
+    match args.get(1).map(String::as_str) {
+        Some("set") => match args.len() {
+            2 => Some(format!(
+                "{CONFIG_SET_USAGE}\nonomedit config set: error: the following arguments are required: key, value"
+            )),
+            3 => Some(format!(
+                "{CONFIG_SET_USAGE}\nonomedit config set: error: the following arguments are required: value"
+            )),
+            5.. => root_unrecognized(args, 4),
+            _ => None,
+        },
+        Some("set-editor") if args.len() == 2 => Some(format!(
+            "{CONFIG_SET_EDITOR_USAGE}\nonomedit config set-editor: error: the following arguments are required: command"
+        )),
+        Some("reset") => root_unrecognized(args, 2),
+        Some(action) => Some(format!(
+            "{CONFIG_USAGE}\nonomedit config: error: argument <操作>: invalid choice: {} (choose from 'set', 'set-editor', 'reset')",
+            python_quote(action)
+        )),
+        None => None,
+    }
+}
+
+fn root_unrecognized(args: &[String], allowed: usize) -> Option<String> {
+    (args.len() > allowed).then(|| {
+        format!(
+            "{ROOT_USAGE}\nonomedit: error: unrecognized arguments: {}",
+            args[allowed..].join(" ")
+        )
+    })
 }
 
 fn compatible_rename_parse_error(args: &[String]) -> Option<String> {
@@ -277,6 +320,11 @@ fn compatible_rename_parse_error(args: &[String]) -> Option<String> {
         };
         match option {
             "--path-type" => {
+                if value.is_none_or(|value| value.starts_with("--")) {
+                    return Some(format!(
+                        "{RENAME_USAGE}\nonomedit rename: error: argument --path-type: expected one argument"
+                    ));
+                }
                 if let Some(message) =
                     invalid_choice("--path-type", &PATH_TYPES, "'full', 'name', 'stem', 'ext'")
                 {
@@ -285,6 +333,11 @@ fn compatible_rename_parse_error(args: &[String]) -> Option<String> {
                 index += 2;
             }
             "--sort-by" => {
+                if value.is_none_or(|value| value.starts_with("--")) {
+                    return Some(format!(
+                        "{RENAME_USAGE}\nonomedit rename: error: argument --sort-by: expected one argument"
+                    ));
+                }
                 if let Some(message) = invalid_choice(
                     "--sort-by",
                     &SORT_KEYS,
@@ -296,6 +349,11 @@ fn compatible_rename_parse_error(args: &[String]) -> Option<String> {
             }
             "--exclude" => {
                 let mut value_index = index + 1;
+                if value_index == args.len() || args[value_index].starts_with('-') {
+                    return Some(format!(
+                        "{RENAME_USAGE}\nonomedit rename: error: argument --exclude: expected at least one argument"
+                    ));
+                }
                 while value_index < args.len() && !args[value_index].starts_with('-') {
                     let value = &args[value_index];
                     if !EXCLUDE_TYPES.contains(&value.as_str()) {
@@ -309,6 +367,11 @@ fn compatible_rename_parse_error(args: &[String]) -> Option<String> {
                 index = value_index;
             }
             "--depth" => {
+                if value.is_none_or(|value| value.starts_with("--")) {
+                    return Some(format!(
+                        "{RENAME_USAGE}\nonomedit rename: error: argument --depth: expected one argument"
+                    ));
+                }
                 if let Some(value) = value {
                     if !value.starts_with("--") && value.parse::<i32>().is_err() {
                         return Some(format!(
@@ -320,6 +383,11 @@ fn compatible_rename_parse_error(args: &[String]) -> Option<String> {
                 index += 2;
             }
             "--timeout" => {
+                if value.is_none_or(|value| value.starts_with("--")) {
+                    return Some(format!(
+                        "{RENAME_USAGE}\nonomedit rename: error: argument --timeout: expected one argument"
+                    ));
+                }
                 if let Some(value) = value {
                     if !value.starts_with("--") && value.parse::<f64>().is_err() {
                         return Some(format!(
@@ -576,13 +644,24 @@ fn compatible_config_set_error(key: &str, raw: &str, error: &config::ConfigError
     }
     if matches!(key, "auto_rules" | "shell_props") {
         if let config::ConfigError::Json(json_error) = error {
-            if json_error.to_string().starts_with("key must be a string") {
+            let message = json_error.to_string();
+            if message.starts_with("key must be a string") {
                 let line = json_error.line();
                 let column = json_error.column();
                 let character = json_character_offset(raw, line, column);
                 return format!(
                     "Expecting property name enclosed in double quotes: line {line} column {column} (char {character})"
                 );
+            }
+            if message.starts_with("EOF while parsing") {
+                let (line, column, character) = json_end_position(raw);
+                return format!("Expecting value: line {line} column {column} (char {character})");
+            }
+            if message.starts_with("trailing comma") || message.starts_with("expected value") {
+                let line = json_error.line();
+                let column = json_error.column();
+                let character = json_character_offset(raw, line, column);
+                return format!("Expecting value: line {line} column {column} (char {character})");
             }
         }
     }
@@ -592,9 +671,18 @@ fn compatible_config_set_error(key: &str, raw: &str, error: &config::ConfigError
 fn json_character_offset(raw: &str, line: usize, column: usize) -> usize {
     raw.split_inclusive('\n')
         .take(line.saturating_sub(1))
-        .map(str::len)
+        .map(|segment| segment.chars().count())
         .sum::<usize>()
         + column.saturating_sub(1)
+}
+
+fn json_end_position(raw: &str) -> (usize, usize, usize) {
+    let line = raw.chars().filter(|ch| *ch == '\n').count() + 1;
+    let column = raw
+        .rsplit('\n')
+        .next()
+        .map_or(1, |last| last.chars().count() + 1);
+    (line, column, raw.chars().count())
 }
 
 fn command_rename(args: RenameArgs) -> i32 {
