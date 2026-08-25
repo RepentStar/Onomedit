@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "editor": "\"C:\\Program Files\\Notepad++\\notepad++.exe\" -multiInst",
+  "editor_alt": "notepad",
+  "editor_timeout": 45.5,
+  "multi_tab": true,
+  "open_editor": true,
+  "apply_rules": true,
+  "path_type": "name",
+  "sort_by": "mtime",
+  "sort_reverse": true,
+  "enable_envvars": true,
+  "enable_auto_rules": true,
+  "expand_subdirs": true,
+  "subdirs_depth": 3,
+  "exclude": {
+    "files": false,
+    "dirs": false,
+    "symlinks": true,
+    "readonly": true,
+    "hidden": false,
+    "system": true
+  },
+  "preview": {
+    "diff": true,
+    "distance": true
+  },
+  "safety": {
+    "sanitize": true
+  },
+  "exit_after": false,
+  "skip_confirmation": false,
+  "shell_props": [
+    {
+      "name": "尺寸",
+      "property": "System.Size"
+    }
+  ],
+  "auto_rules": [
+    {
+      "scope": "stem",
+      "kind": "replace",
+      "find": "旧",
+      "replace": "新",
+      "convert": "",
+      "insert": "",
+      "insert_at": "start",
+      "condition": "\\.txt$",
+      "enabled": true
+    }
+  ],
+  "temp_dir": "D:\\Onomedit Temp"
+}

@@ -769,6 +769,8 @@ pwsh scripts/e2e_release.ps1
 
 产物为 `target\release\onomedit.exe` 和 `target\release\onomedit-cli.exe`。发布物 E2E 使用隔离配置目录且不依赖 Python；推送 `v*` 标签后，GitHub Actions 会构建、验证并发布这两个 Rust 程序。
 
+手动性能基线命令及首轮 Windows 测量结果见 [`docs/RUST_PERFORMANCE_BASELINE.md`](docs/RUST_PERFORMANCE_BASELINE.md)。
+
 ## 许可证
 
 Onomedit 使用 [MIT License](LICENSE)。
