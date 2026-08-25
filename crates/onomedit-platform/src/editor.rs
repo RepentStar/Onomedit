@@ -17,6 +17,20 @@ pub const QUICK_EXIT: Duration = Duration::from_secs(2);
 pub const POLL_INTERVAL: Duration = Duration::from_millis(300);
 pub const PROCESS_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
+const SAVE_POLL_EDITORS: &[&str] = &[
+    "code",
+    "code-insiders",
+    "codium",
+    "gedit",
+    "kate",
+    "mousepad",
+    "notepad",
+    "notepad++",
+    "pluma",
+    "subl",
+    "sublime_text",
+];
+
 #[derive(Debug, Error)]
 pub enum EditorError {
     #[error("编辑器命令为空，请先配置（config set-editor / config set editor）")]
@@ -93,8 +107,12 @@ pub fn launch_and_wait(
             source,
         })?;
     let started = Instant::now();
-    if multi_tab {
-        on_status("编辑器已启动（多标签模式），等待文件保存…");
+    if multi_tab || uses_save_polling(&executable) {
+        if multi_tab {
+            on_status("编辑器已启动（多标签模式），等待文件保存…");
+        } else {
+            on_status("检测到单实例/标签式编辑器，等待文件保存…");
+        }
         poll_save(edit_path, original_signature, timeout, &mut on_status)?;
         return Ok(());
     }
@@ -122,6 +140,15 @@ pub fn launch_and_wait(
         }
         thread::sleep(PROCESS_POLL_INTERVAL);
     }
+}
+
+fn uses_save_polling(executable: &Path) -> bool {
+    let name = executable
+        .file_stem()
+        .unwrap_or(executable.as_os_str())
+        .to_string_lossy()
+        .to_ascii_lowercase();
+    SAVE_POLL_EDITORS.contains(&name.as_str())
 }
 
 fn poll_save(
@@ -252,5 +279,31 @@ mod tests {
             split_command("   "),
             Err(EditorError::EmptyCommand)
         ));
+    }
+
+    #[test]
+    fn known_single_instance_editors_poll_for_saves() {
+        for editor in [
+            "notepad.exe",
+            "NOTEPAD++.EXE",
+            "code.exe",
+            "code-insiders",
+            "codium",
+            "subl.exe",
+            "sublime_text.exe",
+            "gedit",
+            "kate",
+        ] {
+            assert!(
+                uses_save_polling(Path::new(editor)),
+                "{editor} should use save polling"
+            );
+        }
+        for editor in ["vim.exe", "nvim", "nano", "emacsclient"] {
+            assert!(
+                !uses_save_polling(Path::new(editor)),
+                "{editor} should wait for its process"
+            );
+        }
     }
 }

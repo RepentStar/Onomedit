@@ -6,6 +6,7 @@
 set 把第 N 行替换为指定内容；delay 休眠指定秒后追加退出；sleep 仅休眠；
 truncate 只保留前 N 行（模拟用户删行）；launcher 立即退出；
 launcher-delay 启动一个稍后保存的后台进程后立即退出。
+slow-launcher-delay 先延迟退出启动器，再由后台进程稍后保存。
 """
 
 import json
@@ -61,6 +62,18 @@ def main() -> int:
         delay = args[0] if args else "0.5"
         subprocess.Popen(
             [sys.executable, __file__, "delay", delay, path],
+            close_fds=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    elif mode == "slow-launcher-delay":
+        # 模拟现代单实例编辑器：启动进程存活超过“快速退出”阈值后才把文件交给
+        # 已有实例；若仅依赖快速退出判断，调用方会过早删除临时文件。
+        launcher_delay = float(args[0]) if args else 2.1
+        save_delay = args[1] if len(args) > 1 else "0.2"
+        time.sleep(launcher_delay)
+        subprocess.Popen(
+            [sys.executable, __file__, "delay", save_delay, path],
             close_fds=True,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

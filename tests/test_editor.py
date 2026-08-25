@@ -3,6 +3,7 @@
 import os
 import sys
 import threading
+from pathlib import Path
 
 import pytest
 
@@ -24,6 +25,48 @@ def test_split_command_plain():
 def test_split_command_empty_raises():
     with pytest.raises(editor.EditorError):
         editor.split_command("   ")
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "notepad.exe",
+        "NOTEPAD++.EXE",
+        "code.cmd",
+        "code-insiders",
+        "codium",
+        "subl.exe",
+        "sublime_text.exe",
+        "gedit",
+        "kate",
+    ],
+)
+def test_known_single_instance_editors_poll_for_save(command):
+    assert editor._uses_save_polling(command)
+
+
+@pytest.mark.parametrize("command", ["vim.exe", "nvim", "nano", "emacsclient"])
+def test_blocking_editors_wait_for_process(command):
+    assert not editor._uses_save_polling(command)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows 专属：现代 Notepad 启动器回归")
+def test_notepad_waits_for_save_after_slow_launcher_exit(tmp_path):
+    p = _write(tmp_path)
+    sig = tempfile_mgr.signature(p)
+    fake_editor = Path(__file__).with_name("fakeditor.py")
+    batch = tmp_path / "notepad.cmd"
+    batch.write_text(
+        f'@echo off\r\n"{sys.executable}" "{fake_editor}" '
+        'slow-launcher-delay 2.1 0.2 "%~1"\r\n',
+        encoding="utf-8",
+    )
+    statuses = []
+
+    editor.launch_and_wait(str(batch), p, sig, timeout=5, on_status=statuses.append)
+
+    assert tempfile_mgr.changed(sig, tempfile_mgr.signature(p))
+    assert any("单实例" in status for status in statuses)
 
 
 def test_editor_not_found(tmp_path):

@@ -1,12 +1,11 @@
 """编辑器等待策略（多次踩坑，语义必须保留）。
 
-- 单实例型（记事本等）：进程退出即编辑结束。
-- 启动器/多实例型（VSCode、已运行的 Notepad++ 等）：启动器把文件交给已有实例后立即退出，
+- 传统阻塞型（vim 等）：进程退出即编辑结束。
+- 单实例/标签型（现代 Notepad、VSCode、Notepad++ 等）：启动器把文件交给已有实例后退出，
   进程退出不代表编辑结束，须轮询等待文件被保存。
-- 终端型（vim 等）：同单实例型。
 
 默认等进程退出；进程快速退出且文件未改 → 判定为启动器型，改为轮询等待保存。
-显式"多标签"配置时不依赖进程退出，直接轮询等待保存。"""
+已知单实例/标签型编辑器及显式"多标签"配置不依赖进程退出，直接轮询等待保存。"""
 
 from __future__ import annotations
 
@@ -27,6 +26,20 @@ POLL_INTERVAL = 0.3
 PROCESS_POLL_INTERVAL = 0.05
 # 等待编辑器主窗口出现并聚焦的最长时间（秒）
 FOCUS_TIMEOUT = 5.0
+
+SAVE_POLL_EDITORS = {
+    "code",
+    "code-insiders",
+    "codium",
+    "gedit",
+    "kate",
+    "mousepad",
+    "notepad",
+    "notepad++",
+    "pluma",
+    "subl",
+    "sublime_text",
+}
 
 
 class EditorError(RuntimeError):
@@ -58,6 +71,12 @@ def _resolve_command(args: list[str]) -> tuple[str, bool]:
             f"找不到可执行文件 {first!r}，请检查 PATH 或配置编辑器完整路径"
         )
     return exe, exe.lower().endswith((".cmd", ".bat"))
+
+
+def _uses_save_polling(exe: str) -> bool:
+    """现代标签/单实例编辑器须等文件保存，不能把启动进程退出当作编辑结束。"""
+    name = os.path.splitext(os.path.basename(exe))[0].lower()
+    return name in SAVE_POLL_EDITORS
 
 
 def launch_and_wait(
@@ -96,9 +115,12 @@ def launch_and_wait(
     status = on_status or (lambda msg: None)
     start = time.monotonic()
 
-    if multi_tab:
-        # 多标签型：不依赖进程退出，直接轮询等保存
-        status("编辑器已启动（多标签模式），等待文件保存…")
+    if multi_tab or _uses_save_polling(exe):
+        # 标签/单实例型：不依赖启动进程退出，直接轮询等保存。
+        if multi_tab:
+            status("编辑器已启动（多标签模式），等待文件保存…")
+        else:
+            status("检测到单实例/标签式编辑器，等待文件保存…")
         _poll_save(temp_path, sig, timeout, status)
         return
 

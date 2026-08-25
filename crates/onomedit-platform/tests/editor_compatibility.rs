@@ -235,3 +235,43 @@ fn shared_windows_editor_command_cases_match_expected_behavior() {
         assert_ne!(after, before, "case {} did not edit the file", case.name);
     }
 }
+
+#[cfg(windows)]
+#[test]
+fn known_single_instance_editor_waits_after_a_slow_launcher_exit() {
+    let _environment_guard = ENVIRONMENT_LOCK.lock().expect("lock process environment");
+    let repo = repo_root();
+    let python = available_python(&repo);
+    let fake_editor = repo.join("tests/fakeditor.py");
+    let temp = tempfile::tempdir().expect("create temporary directory");
+    let edit_path = temp.path().join("edit.txt");
+    fs::write(&edit_path, "line1\n").expect("write initial edit file");
+    let before =
+        onomedit_core::edit_file::signature(&edit_path).expect("read initial edit file signature");
+    let script = temp.path().join("notepad.cmd");
+    fs::write(
+        &script,
+        format!(
+            "@echo off\r\n\"{}\" \"{}\" slow-launcher-delay 2.1 0.2 \"%~1\"\r\n",
+            python.display(),
+            fake_editor.display()
+        ),
+    )
+    .expect("write notepad launcher");
+    let mut statuses = Vec::new();
+
+    onomedit_platform::editor::launch_and_wait(
+        &command_arg(&script.to_string_lossy()),
+        &edit_path,
+        before,
+        false,
+        Duration::from_secs(5),
+        |status| statuses.push(status.to_owned()),
+    )
+    .expect("wait for delayed save from known single-instance editor");
+
+    let after =
+        onomedit_core::edit_file::signature(&edit_path).expect("read final edit file signature");
+    assert_ne!(after, before, "returned before the delegated editor saved");
+    assert!(statuses.iter().any(|status| status.contains("单实例")));
+}
