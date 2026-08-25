@@ -1,8 +1,9 @@
-# Onomedit
+# Onomeditpp
+
+> [!WARNING]
+> 此版本实现语言为 Rust，使用 Codex 编写，全程无人工参与编码，只保证结果正确，如不放心请使用 [Python 实现版本](https://github.com/RepentStar/Onomedit)，两者设置互通，功能相同，使用方法完全一样，程序名也相同，`Onomeditpp` 仅区分实现方法
 
 Onomedit 是一个借助你熟悉的文本编辑器批量重命名文件和文件夹的工具，提供 CLI 和 GUI 两种使用方式。
-
-> `rust` 分支已经使用 Rust 实现应用、CLI、GUI 和测试辅助程序。发布程序是原生 Windows 可执行文件，构建、测试和运行均不需要 Python。
 
 它会把待处理名称按“一行一个”写进临时文件，打开记事本、VS Code、Vim 等外部编辑器；你可以使用编辑器已有的多光标、列编辑、查找替换或宏，保存并退出后，Onomedit 再安全地执行重命名。
 
@@ -31,7 +32,7 @@ Onomedit 是一个借助你熟悉的文本编辑器批量重命名文件和文�
 
 ### 使用 Windows 预编译程序
 
-从 [GitHub Releases](https://github.com/RepentStar/Onomedit/releases) 下载：
+从 [GitHub Releases](https://github.com/RepentStar/Onomeditpp/releases) 下载：
 
 - `onomedit.exe`：完整版，包含 GUI、拖拽和 CLI。
 - `onomedit-cli.exe`：体积较小的纯 CLI 版；执行 `gui` 会提示此构建未包含 GUI。
@@ -43,8 +44,8 @@ Onomedit 是一个借助你熟悉的文本编辑器批量重命名文件和文�
 项目是 Cargo workspace，最低 Rust 版本为 1.85。当前发布和自动化验收以 Windows 为主；macOS/Linux 实现仍保留，但暂不作为发布门禁。
 
 ```powershell
-git clone --branch rust https://github.com/RepentStar/Onomedit.git
-cd Onomedit
+git clone https://github.com/RepentStar/Onomeditpp.git
+cd Onomeditpp
 
 # 完整版：包含 egui 图形界面和 CLI
 cargo build --locked -p onomedit --bin onomedit
@@ -66,12 +67,12 @@ cargo run -p onomedit --no-default-features --bin onomedit-cli -- help rename
 
 workspace 结构：
 
-| 目录 | 用途 |
-| --- | --- |
-| `crates/onomedit-core` | 路径、规则、收集、计划、执行、日志和恢复 |
-| `crates/onomedit-platform` | 剪贴板、文件属性和外部编辑器协议 |
-| `apps/onomedit` | CLI 分发、补全脚本和可选的 egui GUI |
-| `tests-rust/fixtures` | 共享兼容性和迁移快照 |
+| 目录                       | 用途                                     |
+| -------------------------- | ---------------------------------------- |
+| `crates/onomedit-core`     | 路径、规则、收集、计划、执行、日志和恢复 |
+| `crates/onomedit-platform` | 剪贴板、文件属性和外部编辑器协议         |
+| `apps/onomedit`            | CLI 分发、补全脚本和可选的 egui GUI      |
+| `tests-rust/fixtures`      | 共享兼容性和迁移快照                     |
 
 ## 五分钟快速上手
 
@@ -795,8 +796,6 @@ pwsh scripts/e2e_release.ps1
 ```
 
 产物为 `target\release\onomedit.exe` 和 `target\release\onomedit-cli.exe`。发布物 E2E 使用隔离配置目录且不依赖 Python；推送 `v*` 标签后，GitHub Actions 会构建、验证并发布这两个 Rust 程序。
-
-手动性能基线命令及首轮 Windows 测量结果见 [`docs/RUST_PERFORMANCE_BASELINE.md`](docs/RUST_PERFORMANCE_BASELINE.md)。
 
 ## 许可证
 
