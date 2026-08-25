@@ -228,5 +228,170 @@
       "stdout_len": 5204,
       "stdout_fnv1a64": "c13ce25cddd47c1f"
     }
+  ],
+  "error_snapshots": [
+    {
+      "name": "unknown_command",
+      "args": ["missing"],
+      "exit_code": 2,
+      "stderr_len": 192,
+      "stderr_fnv1a64": "9ed5b51af6e437d9",
+      "stderr_windows_len": 194,
+      "stderr_windows_fnv1a64": "fa16f6534ae009cf"
+    },
+    {
+      "name": "completion_missing",
+      "args": ["completion"],
+      "exit_code": 2,
+      "stderr_len": 124,
+      "stderr_fnv1a64": "4818c4dfcb0df1f8",
+      "stderr_windows_len": 126,
+      "stderr_windows_fnv1a64": "93c723020ff30916"
+    },
+    {
+      "name": "completion_invalid",
+      "args": ["completion", "tcsh"],
+      "exit_code": 2,
+      "stderr_len": 170,
+      "stderr_fnv1a64": "cf9650c7b45d1ecb",
+      "stderr_windows_len": 172,
+      "stderr_windows_fnv1a64": "4c1d45edf747dfd7"
+    },
+    {
+      "name": "config_set_missing",
+      "args": ["config", "set"],
+      "exit_code": 2,
+      "stderr_len": 114,
+      "stderr_fnv1a64": "19b4ef1312af5fb5",
+      "stderr_windows_len": 116,
+      "stderr_windows_fnv1a64": "443d970cbf3f261d"
+    },
+    {
+      "name": "config_set_value_missing",
+      "args": ["config", "set", "editor"],
+      "exit_code": 2,
+      "stderr_len": 109,
+      "stderr_fnv1a64": "cd767b4e87e58eac",
+      "stderr_windows_len": 111,
+      "stderr_windows_fnv1a64": "df0c8c6e54f192a0"
+    },
+    {
+      "name": "config_bool_invalid",
+      "args": ["config", "set", "sort_reverse", "maybe"],
+      "exit_code": 1,
+      "stderr_len": 44,
+      "stderr_fnv1a64": "0212808b90bcc277",
+      "stderr_windows_len": 45,
+      "stderr_windows_fnv1a64": "4228a826f0b5b5bc"
+    },
+    {
+      "name": "config_int_invalid",
+      "args": ["config", "set", "subdirs_depth", "abc"],
+      "exit_code": 1,
+      "stderr_len": 54,
+      "stderr_fnv1a64": "a6a42dd3d9cccbbc",
+      "stderr_windows_len": 55,
+      "stderr_windows_fnv1a64": "f5c22efb16fb4319"
+    },
+    {
+      "name": "config_float_invalid",
+      "args": ["config", "set", "editor_timeout", "abc"],
+      "exit_code": 1,
+      "stderr_len": 49,
+      "stderr_fnv1a64": "72634c11341da8b8",
+      "stderr_windows_len": 50,
+      "stderr_windows_fnv1a64": "7c7abd3b8e79dc95"
+    },
+    {
+      "name": "config_json_invalid",
+      "args": ["config", "set", "auto_rules", "{bad"],
+      "exit_code": 1,
+      "stderr_len": 84,
+      "stderr_fnv1a64": "3ad723ee2520e0c9",
+      "stderr_windows_len": 85,
+      "stderr_windows_fnv1a64": "1c7636a916e0ce82"
+    },
+    {
+      "name": "rename_path_type_invalid",
+      "args": ["rename", "a", "--path-type", "bad"],
+      "exit_code": 2,
+      "stderr_len": 402,
+      "stderr_fnv1a64": "06a6b1b02a650ff1",
+      "stderr_windows_len": 408,
+      "stderr_windows_fnv1a64": "603ae038922675e3"
+    },
+    {
+      "name": "rename_sort_invalid",
+      "args": ["rename", "a", "--sort-by", "bad"],
+      "exit_code": 2,
+      "stderr_len": 422,
+      "stderr_fnv1a64": "b55eb90276368a51",
+      "stderr_windows_len": 428,
+      "stderr_windows_fnv1a64": "6e4475339675652f"
+    },
+    {
+      "name": "rename_depth_invalid",
+      "args": ["rename", "a", "--depth", "abc"],
+      "exit_code": 2,
+      "stderr_len": 357,
+      "stderr_fnv1a64": "d94902484a328308",
+      "stderr_windows_len": 363,
+      "stderr_windows_fnv1a64": "37836793fcd0307a"
+    },
+    {
+      "name": "rename_timeout_invalid",
+      "args": ["rename", "a", "--timeout", "abc"],
+      "exit_code": 2,
+      "stderr_len": 361,
+      "stderr_fnv1a64": "1b5fd1cb6d48f3b5",
+      "stderr_windows_len": 367,
+      "stderr_windows_fnv1a64": "4dfde17944a104d9"
+    },
+    {
+      "name": "rename_exclude_invalid",
+      "args": ["rename", "a", "--exclude", "bad"],
+      "exit_code": 2,
+      "stderr_len": 454,
+      "stderr_fnv1a64": "c1cb460a3bd4291a",
+      "stderr_windows_len": 460,
+      "stderr_windows_fnv1a64": "7966807642177f6a"
+    },
+    {
+      "name": "history_extra",
+      "args": ["history", "extra"],
+      "exit_code": 2,
+      "stderr_len": 79,
+      "stderr_fnv1a64": "69d294a70741a4bb",
+      "stderr_windows_len": 81,
+      "stderr_windows_fnv1a64": "a72b756c4cead2e3"
+    }
+  ],
+  "config_scenarios": [
+    {
+      "name": "corrupt_config_recovers",
+      "initial": "{ not valid json !!!",
+      "args": ["config"],
+      "normalize_config_path": true,
+      "normalize_editor": true,
+      "stdout_len": 717,
+      "stdout_fnv1a64": "2297b87c5f24ab5a",
+      "stdout_windows_len": 755,
+      "stdout_windows_fnv1a64": "b0f912b6e41c9668",
+      "backup_equals_initial": true,
+      "config_unchanged": false
+    },
+    {
+      "name": "missing_and_unknown_fields",
+      "initial": "{\"editor\":\"fixed-editor\",\"unknown\":1,\"exclude\":{\"no_such\":true}}",
+      "args": ["config"],
+      "normalize_config_path": true,
+      "normalize_editor": false,
+      "stdout_len": 721,
+      "stdout_fnv1a64": "88c7ac0bac3f61bb",
+      "stdout_windows_len": 759,
+      "stdout_windows_fnv1a64": "adb3d2be07d91319",
+      "backup_equals_initial": false,
+      "config_unchanged": true
+    }
   ]
 }

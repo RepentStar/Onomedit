@@ -153,12 +153,16 @@ pub fn entry(arguments: impl IntoIterator<Item = OsString>, gui_available: bool)
         );
         return 1;
     }
-    let args = std::iter::once(OsString::from("onomedit")).chain(arguments);
+    let args = std::iter::once(OsString::from("onomedit")).chain(arguments.iter().cloned());
     let cli = match Cli::try_parse_from(args) {
         Ok(cli) => cli,
         Err(error) => {
             let code = if error.use_stderr() { 2 } else { 0 };
-            let _ = error.print();
+            if let Some(message) = compatible_parse_error(&arguments) {
+                error_line!("{message}");
+            } else {
+                let _ = error.print();
+            }
             return code;
         }
     };
@@ -185,6 +189,155 @@ pub fn entry(arguments: impl IntoIterator<Item = OsString>, gui_available: bool)
             0
         }
     }
+}
+
+const ROOT_USAGE: &str = "usage: onomedit <子命令> ...";
+const COMPLETION_USAGE: &str = "usage: onomedit completion {bash,zsh,pwsh,fish,psc}";
+const CONFIG_SET_USAGE: &str = "usage: onomedit config set key value";
+const RENAME_USAGE: &str = "usage: onomedit rename [--dry-run] [--no-editor]\n                       [--path-type {full,name,stem,ext}] [--multi-tab]\n                       [--timeout TIMEOUT] [--sort-by KEY] [--reverse]\n                       [--depth N] [--exclude TYPE [TYPE ...]]\n                       [paths ...]";
+
+fn compatible_parse_error(arguments: &[OsString]) -> Option<String> {
+    let args: Vec<String> = arguments
+        .iter()
+        .map(|value| value.to_string_lossy().into_owned())
+        .collect();
+    let command = args.first()?.as_str();
+    let commands = [
+        "help",
+        "config",
+        "rename",
+        "restore",
+        "history",
+        "gui",
+        "version",
+        "completion",
+    ];
+    if !commands.contains(&command) {
+        return Some(format!(
+            "{ROOT_USAGE}\nonomedit: error: argument <子命令>: invalid choice: {} (choose from 'help', 'config', 'rename', 'restore', 'history', 'gui', 'version', 'completion')",
+            python_quote(command)
+        ));
+    }
+    match command {
+        "completion" => match args.get(1) {
+            None => Some(format!(
+                "{COMPLETION_USAGE}\nonomedit completion: error: the following arguments are required: shell"
+            )),
+            Some(shell) if !completion::SHELLS.contains(&shell.as_str()) => Some(format!(
+                "{COMPLETION_USAGE}\nonomedit completion: error: argument shell: invalid choice: {} (choose from 'bash', 'zsh', 'pwsh', 'fish', 'psc')",
+                python_quote(shell)
+            )),
+            _ => None,
+        },
+        "config" if args.get(1).is_some_and(|action| action == "set") => match args.len() {
+            2 => Some(format!(
+                "{CONFIG_SET_USAGE}\nonomedit config set: error: the following arguments are required: key, value"
+            )),
+            3 => Some(format!(
+                "{CONFIG_SET_USAGE}\nonomedit config set: error: the following arguments are required: value"
+            )),
+            _ => None,
+        },
+        "rename" => compatible_rename_parse_error(&args),
+        "history" if args.iter().skip(1).any(|argument| argument != "--all") => {
+            let unexpected = args
+                .iter()
+                .skip(1)
+                .filter(|argument| argument.as_str() != "--all")
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(" ");
+            Some(format!(
+                "{ROOT_USAGE}\nonomedit: error: unrecognized arguments: {unexpected}"
+            ))
+        }
+        _ => None,
+    }
+}
+
+fn compatible_rename_parse_error(args: &[String]) -> Option<String> {
+    const PATH_TYPES: [&str; 4] = ["full", "name", "stem", "ext"];
+    const SORT_KEYS: [&str; 6] = ["default", "name", "path", "mtime", "ctime", "size"];
+    const EXCLUDE_TYPES: [&str; 12] = [
+        "f", "file", "d", "dir", "l", "link", "r", "readonly", "h", "hidden", "s", "system",
+    ];
+    let mut index = 1;
+    while index < args.len() {
+        let option = args[index].as_str();
+        let value = args.get(index + 1).map(String::as_str);
+        let invalid_choice = |name: &str, choices: &[&str], display: &str| {
+            value
+                .filter(|value| !value.starts_with("--") && !choices.contains(value))
+                .map(|value| {
+                    format!(
+                        "{RENAME_USAGE}\nonomedit rename: error: argument {name}: invalid choice: {} (choose from {display})",
+                        python_quote(value)
+                    )
+                })
+        };
+        match option {
+            "--path-type" => {
+                if let Some(message) =
+                    invalid_choice("--path-type", &PATH_TYPES, "'full', 'name', 'stem', 'ext'")
+                {
+                    return Some(message);
+                }
+                index += 2;
+            }
+            "--sort-by" => {
+                if let Some(message) = invalid_choice(
+                    "--sort-by",
+                    &SORT_KEYS,
+                    "'default', 'name', 'path', 'mtime', 'ctime', 'size'",
+                ) {
+                    return Some(message);
+                }
+                index += 2;
+            }
+            "--exclude" => {
+                let mut value_index = index + 1;
+                while value_index < args.len() && !args[value_index].starts_with('-') {
+                    let value = &args[value_index];
+                    if !EXCLUDE_TYPES.contains(&value.as_str()) {
+                        return Some(format!(
+                            "{RENAME_USAGE}\nonomedit rename: error: argument --exclude: invalid choice: {} (choose from 'f', 'file', 'd', 'dir', 'l', 'link', 'r', 'readonly', 'h', 'hidden', 's', 'system')",
+                            python_quote(value)
+                        ));
+                    }
+                    value_index += 1;
+                }
+                index = value_index;
+            }
+            "--depth" => {
+                if let Some(value) = value {
+                    if !value.starts_with("--") && value.parse::<i32>().is_err() {
+                        return Some(format!(
+                            "{RENAME_USAGE}\nonomedit rename: error: argument --depth: invalid int value: {}",
+                            python_quote(value)
+                        ));
+                    }
+                }
+                index += 2;
+            }
+            "--timeout" => {
+                if let Some(value) = value {
+                    if !value.starts_with("--") && value.parse::<f64>().is_err() {
+                        return Some(format!(
+                            "{RENAME_USAGE}\nonomedit rename: error: argument --timeout: invalid float value: {}",
+                            python_quote(value)
+                        ));
+                    }
+                }
+                index += 2;
+            }
+            _ => index += 1,
+        }
+    }
+    None
+}
+
+fn python_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\\', "\\\\").replace('\'', "\\'"))
 }
 
 fn command_help(topic: Option<&str>) -> i32 {
@@ -375,7 +528,10 @@ fn command_config(action: Option<ConfigAction>) -> i32 {
                     0
                 }
                 Err(error) => {
-                    error_line!("错误: {error}");
+                    error_line!(
+                        "错误: {}",
+                        compatible_config_set_error(&key, &value, &error)
+                    );
                     1
                 }
             }
@@ -405,6 +561,40 @@ fn command_config(action: Option<ConfigAction>) -> i32 {
             }
         },
     }
+}
+
+fn compatible_config_set_error(key: &str, raw: &str, error: &config::ConfigError) -> String {
+    let value = raw.trim();
+    if key == "subdirs_depth" && value.parse::<i64>().is_err() {
+        return format!(
+            "invalid literal for int() with base 10: {}",
+            python_quote(value)
+        );
+    }
+    if key == "editor_timeout" && value.parse::<f64>().is_err() {
+        return format!("could not convert string to float: {}", python_quote(value));
+    }
+    if matches!(key, "auto_rules" | "shell_props") {
+        if let config::ConfigError::Json(json_error) = error {
+            if json_error.to_string().starts_with("key must be a string") {
+                let line = json_error.line();
+                let column = json_error.column();
+                let character = json_character_offset(raw, line, column);
+                return format!(
+                    "Expecting property name enclosed in double quotes: line {line} column {column} (char {character})"
+                );
+            }
+        }
+    }
+    error.to_string()
+}
+
+fn json_character_offset(raw: &str, line: usize, column: usize) -> usize {
+    raw.split_inclusive('\n')
+        .take(line.saturating_sub(1))
+        .map(str::len)
+        .sum::<usize>()
+        + column.saturating_sub(1)
 }
 
 fn command_rename(args: RenameArgs) -> i32 {

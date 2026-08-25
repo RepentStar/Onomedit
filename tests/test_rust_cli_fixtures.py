@@ -41,6 +41,22 @@ def _fnv1a64(data: bytes) -> str:
     return f"{value:016x}"
 
 
+def _normalize_snapshot_stdout(stdout: bytes, config_root: Path, case: dict) -> bytes:
+    if case.get("normalize_config_path"):
+        config_path = str(config_root / "Onomedit" / "config.json").encode()
+        assert config_path in stdout
+        stdout = stdout.replace(config_path, b"<CONFIG_PATH>")
+    if case.get("normalize_editor"):
+        normalized = re.sub(
+            br'(?m)^  "editor": .*?(?P<cr>\r?)$',
+            br'  "editor": "<EDITOR>",\g<cr>',
+            stdout,
+        )
+        assert normalized != stdout
+        stdout = normalized
+    return stdout
+
+
 @pytest.mark.parametrize("case", _fixture()["cases"], ids=lambda case: case["name"])
 def test_shared_cli_golden(tmp_path, case):
     result = _run(case["args"], tmp_path / "config", case.get("stdin"))
@@ -63,25 +79,53 @@ def test_shared_cli_golden(tmp_path, case):
 def test_shared_cli_byte_snapshot(tmp_path, case):
     config_root = tmp_path / "config"
     result = _run(case["args"], config_root)
-    stdout = result.stdout
-    if case.get("normalize_config_path"):
-        config_path = str(config_root / "Onomedit" / "config.json").encode()
-        assert config_path in stdout
-        stdout = stdout.replace(config_path, b"<CONFIG_PATH>")
-    if case.get("normalize_editor"):
-        normalized = re.sub(
-            br'(?m)^  "editor": .*?(?P<cr>\r?)$',
-            br'  "editor": "<EDITOR>",\g<cr>',
-            stdout,
-        )
-        assert normalized != stdout
-        stdout = normalized
+    stdout = _normalize_snapshot_stdout(result.stdout, config_root, case)
 
     suffix = "_windows" if os.name == "nt" and "stdout_windows_len" in case else ""
     assert result.returncode == 0
     assert result.stderr == b""
     assert len(stdout) == case[f"stdout{suffix}_len"]
     assert _fnv1a64(stdout) == case[f"stdout{suffix}_fnv1a64"]
+
+
+@pytest.mark.parametrize(
+    "case", _fixture()["error_snapshots"], ids=lambda case: case["name"]
+)
+def test_shared_cli_error_byte_snapshot(tmp_path, case):
+    result = _run(case["args"], tmp_path / "config")
+    suffix = "_windows" if os.name == "nt" else ""
+
+    assert result.returncode == case["exit_code"]
+    assert result.stdout == b""
+    assert len(result.stderr) == case[f"stderr{suffix}_len"]
+    assert _fnv1a64(result.stderr) == case[f"stderr{suffix}_fnv1a64"]
+
+
+@pytest.mark.parametrize(
+    "case", _fixture()["config_scenarios"], ids=lambda case: case["name"]
+)
+def test_shared_cli_config_file_scenario(tmp_path, case):
+    config_root = tmp_path / "config"
+    config_path = config_root / "Onomedit" / "config.json"
+    config_path.parent.mkdir(parents=True)
+    initial = case["initial"].encode()
+    config_path.write_bytes(initial)
+
+    result = _run(case["args"], config_root)
+    stdout = _normalize_snapshot_stdout(result.stdout, config_root, case)
+    suffix = "_windows" if os.name == "nt" else ""
+    backup = config_path.with_suffix(".json.bak")
+
+    assert result.returncode == 0
+    assert result.stderr == b""
+    assert len(stdout) == case[f"stdout{suffix}_len"]
+    assert _fnv1a64(stdout) == case[f"stdout{suffix}_fnv1a64"]
+    assert backup.exists() is case["backup_equals_initial"]
+    if case["backup_equals_initial"]:
+        assert backup.read_bytes() == initial
+        json.loads(config_path.read_text(encoding="utf-8"))
+    if case["config_unchanged"]:
+        assert config_path.read_bytes() == initial
 
 
 def test_python_cli_rename_history_restore_workflow(tmp_path):

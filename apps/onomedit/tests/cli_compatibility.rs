@@ -9,6 +9,8 @@ use serde::Deserialize;
 struct Fixture {
     cases: Vec<Case>,
     snapshots: Vec<Snapshot>,
+    error_snapshots: Vec<ErrorSnapshot>,
+    config_scenarios: Vec<ConfigScenario>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -39,6 +41,32 @@ struct Snapshot {
     stdout_fnv1a64: String,
     stdout_windows_len: Option<usize>,
     stdout_windows_fnv1a64: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ErrorSnapshot {
+    name: String,
+    args: Vec<String>,
+    exit_code: i32,
+    stderr_len: usize,
+    stderr_fnv1a64: String,
+    stderr_windows_len: usize,
+    stderr_windows_fnv1a64: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct ConfigScenario {
+    name: String,
+    initial: String,
+    args: Vec<String>,
+    normalize_config_path: bool,
+    normalize_editor: bool,
+    stdout_len: usize,
+    stdout_fnv1a64: String,
+    stdout_windows_len: usize,
+    stdout_windows_fnv1a64: String,
+    backup_equals_initial: bool,
+    config_unchanged: bool,
 }
 
 fn fixture() -> Fixture {
@@ -75,6 +103,35 @@ fn fnv1a64(data: &[u8]) -> String {
         value = value.wrapping_mul(0x0000_0100_0000_01b3);
     }
     format!("{value:016x}")
+}
+
+fn normalize_snapshot_stdout(
+    stdout: Vec<u8>,
+    config_root: &Path,
+    normalize_config_path: bool,
+    normalize_editor: bool,
+) -> String {
+    let mut stdout = String::from_utf8(stdout).unwrap();
+    if normalize_config_path {
+        let config_path = config_root.join("Onomedit").join("config.json");
+        let config_path = config_path.to_string_lossy();
+        assert!(stdout.contains(config_path.as_ref()));
+        stdout = stdout.replace(config_path.as_ref(), "<CONFIG_PATH>");
+    }
+    if normalize_editor {
+        let prefix = "  \"editor\": ";
+        let value_start = stdout.find(prefix).expect("editor line") + prefix.len();
+        let line_end = value_start
+            + stdout[value_start..]
+                .find('\n')
+                .expect("editor line terminator");
+        let value_end = value_start
+            + stdout[value_start..line_end]
+                .rfind(',')
+                .expect("editor value terminator");
+        stdout.replace_range(value_start..value_end, "\"<EDITOR>\"");
+    }
+    stdout
 }
 
 #[test]
@@ -136,30 +193,12 @@ fn shared_cli_byte_snapshots_match() {
         assert_eq!(output.status.code(), Some(0), "{} code", snapshot.name);
         assert!(output.stderr.is_empty(), "{} stderr", snapshot.name);
 
-        let mut stdout = String::from_utf8(output.stdout).unwrap();
-        if snapshot.normalize_config_path {
-            let config_path = config_root.join("Onomedit").join("config.json");
-            let config_path = config_path.to_string_lossy();
-            assert!(
-                stdout.contains(config_path.as_ref()),
-                "{} omitted config path {config_path:?}",
-                snapshot.name
-            );
-            stdout = stdout.replace(config_path.as_ref(), "<CONFIG_PATH>");
-        }
-        if snapshot.normalize_editor {
-            let prefix = "  \"editor\": ";
-            let value_start = stdout.find(prefix).expect("editor line") + prefix.len();
-            let line_end = value_start
-                + stdout[value_start..]
-                    .find('\n')
-                    .expect("editor line terminator");
-            let value_end = value_start
-                + stdout[value_start..line_end]
-                    .rfind(',')
-                    .expect("editor value terminator");
-            stdout.replace_range(value_start..value_end, "\"<EDITOR>\"");
-        }
+        let stdout = normalize_snapshot_stdout(
+            output.stdout,
+            &config_root,
+            snapshot.normalize_config_path,
+            snapshot.normalize_editor,
+        );
         let bytes = stdout.as_bytes();
         let expected_len = if cfg!(windows) {
             snapshot.stdout_windows_len.unwrap_or(snapshot.stdout_len)
@@ -176,6 +215,101 @@ fn shared_cli_byte_snapshots_match() {
         };
         assert_eq!(bytes.len(), expected_len, "{} byte length", snapshot.name);
         assert_eq!(fnv1a64(bytes), expected_hash, "{} bytes", snapshot.name);
+    }
+}
+
+#[test]
+fn shared_cli_error_byte_snapshots_match() {
+    for snapshot in fixture().error_snapshots {
+        let directory = tempfile::tempdir().unwrap();
+        let output = run(&snapshot.args, &directory.path().join("config"), None);
+        assert_eq!(
+            output.status.code(),
+            Some(snapshot.exit_code),
+            "{} code",
+            snapshot.name
+        );
+        assert!(output.stdout.is_empty(), "{} stdout", snapshot.name);
+        let expected_len = if cfg!(windows) {
+            snapshot.stderr_windows_len
+        } else {
+            snapshot.stderr_len
+        };
+        let expected_hash = if cfg!(windows) {
+            &snapshot.stderr_windows_fnv1a64
+        } else {
+            &snapshot.stderr_fnv1a64
+        };
+        assert_eq!(
+            output.stderr.len(),
+            expected_len,
+            "{} stderr byte length",
+            snapshot.name
+        );
+        assert_eq!(
+            fnv1a64(&output.stderr),
+            expected_hash.as_str(),
+            "{} stderr bytes",
+            snapshot.name
+        );
+    }
+}
+
+#[test]
+fn shared_cli_config_file_scenarios_match() {
+    for scenario in fixture().config_scenarios {
+        let directory = tempfile::tempdir().unwrap();
+        let config_root = directory.path().join("config");
+        let config_path = config_root.join("Onomedit").join("config.json");
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+        fs::write(&config_path, scenario.initial.as_bytes()).unwrap();
+
+        let output = run(&scenario.args, &config_root, None);
+        assert_eq!(output.status.code(), Some(0), "{} code", scenario.name);
+        assert!(output.stderr.is_empty(), "{} stderr", scenario.name);
+        let stdout = normalize_snapshot_stdout(
+            output.stdout,
+            &config_root,
+            scenario.normalize_config_path,
+            scenario.normalize_editor,
+        );
+        let expected_len = if cfg!(windows) {
+            scenario.stdout_windows_len
+        } else {
+            scenario.stdout_len
+        };
+        let expected_hash = if cfg!(windows) {
+            &scenario.stdout_windows_fnv1a64
+        } else {
+            &scenario.stdout_fnv1a64
+        };
+        assert_eq!(
+            stdout.len(),
+            expected_len,
+            "{} stdout length",
+            scenario.name
+        );
+        assert_eq!(
+            fnv1a64(stdout.as_bytes()),
+            expected_hash.as_str(),
+            "{} stdout bytes",
+            scenario.name
+        );
+
+        let backup = config_path.with_extension("json.bak");
+        assert_eq!(
+            backup.exists(),
+            scenario.backup_equals_initial,
+            "{} backup presence",
+            scenario.name
+        );
+        if scenario.backup_equals_initial {
+            assert_eq!(fs::read(&backup).unwrap(), scenario.initial.as_bytes());
+            serde_json::from_slice::<serde_json::Value>(&fs::read(&config_path).unwrap()).unwrap();
+        }
+        if scenario.config_unchanged {
+            assert_eq!(fs::read(&config_path).unwrap(), scenario.initial.as_bytes());
+        }
     }
 }
 
