@@ -43,8 +43,10 @@ def test_shared_distance_cases():
 
 
 def test_shared_rule_cases():
-    for case in _fixture()["rules"]:
-        assert apply_rule(case["value"], rule_from_dict(case["rule"])) == case["expected"]
+    for index, case in enumerate(_fixture()["rules"]):
+        assert apply_rule(case["value"], rule_from_dict(case["rule"])) == case["expected"], (
+            f"rule case {index}: {case['rule']!r}"
+        )
 
 
 def test_shared_template_sequences():

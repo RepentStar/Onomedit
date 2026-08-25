@@ -67,8 +67,7 @@ pub fn apply(value: &str, rule: &Rule) -> String {
         "replace_icase" if !rule.find.is_empty() => {
             replace_ignore_case(value, &rule.find, &rule.replace)
         }
-        "regex" if !rule.find.is_empty() => Regex::new(&rule.find)
-            .ok()
+        "regex" if !rule.find.is_empty() => compile_python_regex(&rule.find)
             .and_then(|regex| {
                 let parts = parse_python_replacement(&rule.replace, &regex).ok()?;
                 replace_with_captures(value, &regex, &parts)
@@ -87,10 +86,187 @@ fn condition_matches(value: &str, condition: &str) -> bool {
     if condition.is_empty() {
         return true;
     }
-    Regex::new(condition)
-        .ok()
+    compile_python_regex(condition)
         .and_then(|regex| regex.is_match(value).ok())
         .unwrap_or(false)
+}
+
+fn compile_python_regex(pattern: &str) -> Option<Regex> {
+    let pattern = adapt_python_pattern(pattern);
+    Regex::new(&pattern).ok()
+}
+
+fn adapt_python_pattern(pattern: &str) -> String {
+    // Python's global `(?a)` flag makes shorthand classes and word boundaries ASCII-only.
+    // fancy-regex rejects disabling Unicode, so remove `a` and expand those shorthands.
+    let mut adapted = pattern.to_owned();
+    let mut global_ascii = false;
+    if let Some(flags_end) = pattern.strip_prefix("(?").and_then(|rest| rest.find(')')) {
+        let flags = &pattern[2..flags_end + 2];
+        if !flags.is_empty()
+            && flags.chars().all(|flag| "aiLmsux-".contains(flag))
+            && flags.contains('a')
+        {
+            if flags.contains('u') {
+                return pattern.into();
+            }
+            let rust_flags: String = flags.chars().filter(|flag| *flag != 'a').collect();
+            let remainder = &pattern[flags_end + 3..];
+            adapted = if rust_flags.is_empty() {
+                remainder.to_owned()
+            } else {
+                format!("(?{rust_flags}){remainder}")
+            };
+            global_ascii = true;
+        }
+    }
+    let adapted = adapt_ascii_scopes(&adapted);
+    if global_ascii {
+        ascii_character_classes(&adapted)
+    } else {
+        adapted
+    }
+}
+
+fn adapt_ascii_scopes(pattern: &str) -> String {
+    let Some(start) = find_ascii_scope(pattern) else {
+        return pattern.into();
+    };
+    let body_start = start + "(?a:".len();
+    let Some(end) = find_group_end(pattern, body_start) else {
+        return pattern.into();
+    };
+    let mut output = String::with_capacity(pattern.len());
+    output.push_str(&pattern[..start]);
+    output.push_str("(?:");
+    output.push_str(&ascii_character_classes(&adapt_ascii_scopes(
+        &pattern[body_start..end],
+    )));
+    output.push(')');
+    output.push_str(&adapt_ascii_scopes(&pattern[end + 1..]));
+    output
+}
+
+fn find_ascii_scope(pattern: &str) -> Option<usize> {
+    let mut escaped = false;
+    let mut in_class = false;
+    for (index, ch) in pattern.char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == '[' {
+            in_class = true;
+            continue;
+        }
+        if ch == ']' {
+            in_class = false;
+            continue;
+        }
+        if !in_class && pattern[index..].starts_with("(?a:") {
+            return Some(index);
+        }
+    }
+    None
+}
+
+fn find_group_end(pattern: &str, body_start: usize) -> Option<usize> {
+    let mut depth = 1;
+    let mut escaped = false;
+    let mut in_class = false;
+    for (offset, ch) in pattern[body_start..].char_indices() {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == '[' {
+            in_class = true;
+            continue;
+        }
+        if ch == ']' {
+            in_class = false;
+            continue;
+        }
+        if in_class {
+            continue;
+        }
+        if ch == '(' {
+            depth += 1;
+        } else if ch == ')' {
+            depth -= 1;
+            if depth == 0 {
+                return Some(body_start + offset);
+            }
+        }
+    }
+    None
+}
+
+fn ascii_character_classes(pattern: &str) -> String {
+    const WORD_BOUNDARY: &str =
+        "(?:(?<![A-Za-z0-9_])(?=[A-Za-z0-9_])|(?<=[A-Za-z0-9_])(?![A-Za-z0-9_]))";
+    const NON_WORD_BOUNDARY: &str = "(?:(?=[\\s\\S])|(?<=[\\s\\S]))(?:(?<=[A-Za-z0-9_])(?=[A-Za-z0-9_])|(?<![A-Za-z0-9_])(?![A-Za-z0-9_]))";
+    let chars: Vec<char> = pattern.chars().collect();
+    let mut output = String::with_capacity(pattern.len());
+    let mut in_class = false;
+    let mut index = 0;
+    while index < chars.len() {
+        let ch = chars[index];
+        if ch == '[' {
+            in_class = true;
+            output.push(ch);
+            index += 1;
+            continue;
+        }
+        if ch == ']' && in_class {
+            in_class = false;
+            output.push(ch);
+            index += 1;
+            continue;
+        }
+        if ch != '\\' || index + 1 == chars.len() {
+            output.push(ch);
+            index += 1;
+            continue;
+        }
+        let escaped = chars[index + 1];
+        let replacement = if in_class {
+            match escaped {
+                'w' => Some("A-Za-z0-9_"),
+                'd' => Some("0-9"),
+                's' => Some(" \\t\\n\\r\\f\\v"),
+                _ => None,
+            }
+        } else {
+            match escaped {
+                'w' => Some("[A-Za-z0-9_]"),
+                'W' => Some("[^A-Za-z0-9_]"),
+                'd' => Some("[0-9]"),
+                'D' => Some("[^0-9]"),
+                's' => Some("[ \\t\\n\\r\\f\\v]"),
+                'S' => Some("[^ \\t\\n\\r\\f\\v]"),
+                'b' => Some(WORD_BOUNDARY),
+                'B' => Some(NON_WORD_BOUNDARY),
+                _ => None,
+            }
+        };
+        if let Some(replacement) = replacement {
+            output.push_str(replacement);
+        } else {
+            output.push('\\');
+            output.push(escaped);
+        }
+        index += 2;
+    }
+    output
 }
 
 fn replace_ignore_case(value: &str, find: &str, replacement: &str) -> String {
@@ -192,6 +368,9 @@ fn parse_python_replacement(replacement: &str, regex: &Regex) -> Result<Vec<Part
                     .take_while(|ch| ('0'..='7').contains(ch))
                     .collect();
                 let value = u32::from_str_radix(&octal, 8).map_err(|_| ())?;
+                if value > 0o377 {
+                    return Err(());
+                }
                 literal.push(char::from_u32(value).ok_or(())?);
                 index = start + octal.len();
                 continue;
@@ -235,8 +414,13 @@ fn parse_python_replacement(replacement: &str, regex: &Regex) -> Result<Vec<Part
 fn replace_with_captures(value: &str, regex: &Regex, parts: &[Part]) -> Option<String> {
     let mut output = String::with_capacity(value.len());
     let mut previous_end = 0;
-    for captures in regex.captures_iter(value) {
-        let captures = captures.ok()?;
+    let mut search_start = 0;
+    // Python allows an empty match immediately after a non-empty match. fancy-regex's capture
+    // iterator skips it, so drive captures_from_pos directly and advance only after empty matches.
+    while search_start <= value.len() {
+        let Some(captures) = regex.captures_from_pos(value, search_start).ok()? else {
+            break;
+        };
         let whole = captures.get(0)?;
         output.push_str(&value[previous_end..whole.start()]);
         for part in parts {
@@ -255,9 +439,21 @@ fn replace_with_captures(value: &str, regex: &Regex, parts: &[Part]) -> Option<S
             }
         }
         previous_end = whole.end();
+        search_start = if whole.start() == whole.end() {
+            next_utf8_boundary(value, whole.end())
+        } else {
+            whole.end()
+        };
     }
     output.push_str(&value[previous_end..]);
     Some(output)
+}
+
+fn next_utf8_boundary(value: &str, position: usize) -> usize {
+    value[position..]
+        .chars()
+        .next()
+        .map_or(value.len() + 1, |ch| position + ch.len_utf8())
 }
 
 #[cfg(test)]

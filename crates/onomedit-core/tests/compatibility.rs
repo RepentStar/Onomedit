@@ -122,8 +122,13 @@ fn shared_distance_cases_match() {
 
 #[test]
 fn shared_rule_cases_match() {
-    for case in fixture().rules {
-        assert_eq!(rules::apply(&case.value, &case.rule), case.expected);
+    for (index, case) in fixture().rules.into_iter().enumerate() {
+        assert_eq!(
+            rules::apply(&case.value, &case.rule),
+            case.expected,
+            "rule case {index}: {:?}",
+            case.rule
+        );
     }
 }
 
