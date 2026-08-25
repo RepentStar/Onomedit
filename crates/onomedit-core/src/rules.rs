@@ -1,5 +1,6 @@
 use fancy_regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::path::PathType;
@@ -92,20 +93,110 @@ fn condition_matches(value: &str, condition: &str) -> bool {
 }
 
 fn compile_python_regex(pattern: &str) -> Option<Regex> {
-    let pattern = adapt_python_pattern(pattern);
+    let pattern = adapt_named_conditionals(pattern);
+    let pattern = adapt_python_pattern(&pattern);
     Regex::new(&pattern).ok()
+}
+
+fn adapt_named_conditionals(pattern: &str) -> String {
+    let mut names = HashMap::new();
+    let mut capture_count = 0;
+    let mut output = String::with_capacity(pattern.len());
+    let mut index = 0;
+    let mut escaped = false;
+    let mut in_class = false;
+    while index < pattern.len() {
+        let ch = pattern[index..]
+            .chars()
+            .next()
+            .expect("valid character boundary");
+        let char_len = ch.len_utf8();
+        if escaped {
+            output.push(ch);
+            escaped = false;
+            index += char_len;
+            continue;
+        }
+        if ch == '\\' {
+            output.push(ch);
+            escaped = true;
+            index += char_len;
+            continue;
+        }
+        if ch == '[' {
+            in_class = true;
+            output.push(ch);
+            index += char_len;
+            continue;
+        }
+        if ch == ']' && in_class {
+            in_class = false;
+            output.push(ch);
+            index += char_len;
+            continue;
+        }
+        if in_class || ch != '(' {
+            output.push(ch);
+            index += char_len;
+            continue;
+        }
+        if pattern[index..].starts_with("(?#") {
+            let Some(comment_end) = pattern[index + 3..].find(')') else {
+                output.push_str(&pattern[index..]);
+                break;
+            };
+            let end = index + 3 + comment_end + 1;
+            output.push_str(&pattern[index..end]);
+            index = end;
+            continue;
+        }
+        if pattern[index..].starts_with("(?P<") {
+            let Some(name_end) = pattern[index + 4..].find('>') else {
+                output.push_str(&pattern[index..]);
+                break;
+            };
+            capture_count += 1;
+            let end = index + 4 + name_end + 1;
+            names.insert(pattern[index + 4..end - 1].to_owned(), capture_count);
+            output.push_str(&pattern[index..end]);
+            index = end;
+            continue;
+        }
+        if pattern[index..].starts_with("(?(") {
+            let Some(reference_end) = pattern[index + 3..].find(')') else {
+                output.push_str(&pattern[index..]);
+                break;
+            };
+            let end = index + 3 + reference_end;
+            let reference = &pattern[index + 3..end];
+            if let Some(group) = names.get(reference) {
+                output.push_str(&format!("(?({group})"));
+            } else {
+                output.push_str(&pattern[index..end + 1]);
+            }
+            index = end + 1;
+            continue;
+        }
+        if !pattern[index..].starts_with("(?") {
+            capture_count += 1;
+        }
+        output.push(ch);
+        index += char_len;
+    }
+    output
 }
 
 fn adapt_python_pattern(pattern: &str) -> String {
     // Python's global `(?a)` flag makes shorthand classes and word boundaries ASCII-only.
     // fancy-regex rejects disabling Unicode, so remove `a` and expand those shorthands.
     let Some((flags, remainder)) = global_flags(pattern) else {
-        return adapt_fragment(pattern, false, false, false).0;
+        return adapt_fragment(pattern, false, false, false, false).0;
     };
     if invalid_python_flags(flags) {
         return pattern.into();
     }
     let ascii_mode = flags.contains('a');
+    let ignore_case = flags.contains('i');
     let verbose_mode = flags.contains('x');
     let rust_flags: String = flags
         .chars()
@@ -115,7 +206,7 @@ fn adapt_python_pattern(pattern: &str) -> String {
     if !rust_flags.is_empty() {
         output.push_str(&format!("(?{rust_flags})"));
     }
-    output.push_str(&adapt_fragment(remainder, ascii_mode, verbose_mode, false).0);
+    output.push_str(&adapt_fragment(remainder, ascii_mode, ignore_case, verbose_mode, false).0);
     output
 }
 
@@ -136,6 +227,7 @@ fn invalid_python_flags(flags: &str) -> bool {
 fn adapt_fragment(
     pattern: &str,
     ascii_mode: bool,
+    ignore_case: bool,
     verbose_mode: bool,
     stop_at_close: bool,
 ) -> (String, usize) {
@@ -166,7 +258,14 @@ fn adapt_fragment(
             };
             let class = &pattern[index..index + class_end];
             if ascii_mode {
-                output.push_str(&adapt_ascii_class(class));
+                let adapted = adapt_ascii_class(class);
+                if ignore_case {
+                    output.push_str(&adapt_ascii_ignore_case_class(class, &adapted));
+                } else {
+                    output.push_str(&adapted);
+                }
+            } else if ignore_case {
+                output.push_str(&adapt_unicode_ignore_case_class(class));
             } else {
                 output.push_str(class);
             }
@@ -174,6 +273,36 @@ fn adapt_fragment(
             continue;
         }
         if ch == '(' {
+            if pattern[index..].starts_with("(?#") {
+                let Some(comment_end) = pattern[index + 3..].find(')') else {
+                    output.push_str(&pattern[index..]);
+                    return (output, pattern.len());
+                };
+                output.push_str("(?:)");
+                index += 3 + comment_end + 1;
+                continue;
+            }
+            if pattern[index..].starts_with("(?P<") {
+                let Some(name_end) = pattern[index + 4..].find('>') else {
+                    output.push_str(&pattern[index..]);
+                    return (output, pattern.len());
+                };
+                let header_end = index + 4 + name_end + 1;
+                output.push_str(&pattern[index..header_end]);
+                ordinary_depth += 1;
+                index = header_end;
+                continue;
+            }
+            if pattern[index..].starts_with("(?P=") {
+                let Some(backref_end) = pattern[index + 4..].find(')') else {
+                    output.push_str(&pattern[index..]);
+                    return (output, pattern.len());
+                };
+                let group_end = index + 4 + backref_end + 1;
+                output.push_str(&pattern[index..group_end]);
+                index = group_end;
+                continue;
+            }
             if let Some((body_start, flags)) = scoped_flags(pattern, index) {
                 let (enabled, disabled) = flags.split_once('-').unwrap_or((flags, ""));
                 let invalid = flags.matches('-').count() > 1
@@ -195,6 +324,13 @@ fn adapt_fragment(
                 } else {
                     verbose_mode
                 };
+                let inner_ignore_case = if enabled.contains('i') {
+                    true
+                } else if disabled.contains('i') {
+                    false
+                } else {
+                    ignore_case
+                };
                 let rust_flags: String = if invalid {
                     flags.into()
                 } else {
@@ -206,8 +342,13 @@ fn adapt_fragment(
                 output.push_str("(?");
                 output.push_str(&rust_flags);
                 output.push(':');
-                let (body, body_end) =
-                    adapt_fragment(&pattern[body_start..], inner_ascii, inner_verbose, true);
+                let (body, body_end) = adapt_fragment(
+                    &pattern[body_start..],
+                    inner_ascii,
+                    inner_ignore_case,
+                    inner_verbose,
+                    true,
+                );
                 output.push_str(&body);
                 if body_end == pattern[body_start..].len() {
                     return (output, pattern.len());
@@ -260,7 +401,23 @@ fn adapt_fragment(
             index = escaped_start + escaped.len_utf8();
             continue;
         }
-        output.push(ch);
+        if ascii_mode && ignore_case && matches!(ch, 's' | 'S') {
+            output.push_str("(?!(?-i:ſ))");
+            output.push(ch);
+        } else if ascii_mode && ignore_case && matches!(ch, 'k' | 'K') {
+            output.push_str("(?!(?-i:K))");
+            output.push(ch);
+        } else if ascii_mode && ignore_case && !ch.is_ascii() {
+            output.push_str(&format!("(?-i:{ch})"));
+        } else if !ascii_mode && ignore_case {
+            if let Some(case_class) = python_ignore_case_class(ch) {
+                output.push_str(case_class);
+            } else {
+                output.push(ch);
+            }
+        } else {
+            output.push(ch);
+        }
         index += char_len;
     }
     (output, pattern.len())
@@ -365,6 +522,98 @@ fn adapt_ascii_class(class: &str) -> String {
     }
     output.push_str("[\\s\\S])");
     output
+}
+
+fn adapt_ascii_ignore_case_class(class: &str, adapted: &str) -> String {
+    let content = class
+        .strip_prefix("[^")
+        .and_then(|content| content.strip_suffix(']'));
+    let negated = content.is_some();
+    let mut include = String::new();
+    let mut exclude = String::new();
+    for (ascii, special) in [(&['s', 'S'][..], 'ſ'), (&['k', 'K'][..], 'K')] {
+        let has_ascii = class_mentions_any(class, ascii);
+        let has_special = class_mentions_any(class, &[special]);
+        let python_matches = if negated { !has_special } else { has_special };
+        let fancy_matches = if negated {
+            !(has_ascii || has_special)
+        } else {
+            has_ascii || has_special
+        };
+        if python_matches && !fancy_matches {
+            include.push(special);
+        } else if !python_matches && fancy_matches {
+            exclude.push(special);
+        }
+    }
+    let mut output = String::new();
+    if !exclude.is_empty() {
+        output.push_str(&format!("(?!(?-i:[{exclude}]))"));
+    }
+    if include.is_empty() {
+        output.push_str(adapted);
+    } else {
+        output.push_str(&format!("(?:(?-i:[{include}])|{adapted})"));
+    }
+    output
+}
+
+fn python_ignore_case_class(ch: char) -> Option<&'static str> {
+    match ch {
+        'i' | 'I' | 'İ' | 'ı' => Some("[iIİı]"),
+        's' | 'S' | 'ſ' => Some("[sSſ]"),
+        'k' | 'K' | 'K' => Some("[kKK]"),
+        _ => None,
+    }
+}
+
+fn adapt_unicode_ignore_case_class(class: &str) -> String {
+    let mut additions = String::new();
+    if class_mentions_any(class, &['i', 'I', 'İ', 'ı']) {
+        additions.push_str("iIİı");
+    }
+    if class_mentions_any(class, &['s', 'S', 'ſ']) {
+        additions.push_str("sSſ");
+    }
+    if class_mentions_any(class, &['k', 'K', 'K']) {
+        additions.push_str("kKK");
+    }
+    if additions.is_empty() {
+        return class.into();
+    }
+    format!("{}{}]", &class[..class.len() - 1], additions)
+}
+
+fn class_mentions_any(class: &str, targets: &[char]) -> bool {
+    let mut chars = class[1..class.len() - 1].chars().peekable();
+    if chars.peek() == Some(&'^') {
+        chars.next();
+    }
+    let mut previous = None;
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            chars.next();
+            previous = None;
+            continue;
+        }
+        if ch == '-' {
+            if let (Some(start), Some(&end)) = (previous, chars.peek()) {
+                if targets
+                    .iter()
+                    .any(|target| start <= *target && *target <= end)
+                {
+                    return true;
+                }
+            }
+            previous = None;
+            continue;
+        }
+        if targets.contains(&ch) {
+            return true;
+        }
+        previous = Some(ch);
+    }
+    false
 }
 
 fn replace_ignore_case(value: &str, find: &str, replacement: &str) -> String {
