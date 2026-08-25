@@ -99,173 +99,271 @@ fn compile_python_regex(pattern: &str) -> Option<Regex> {
 fn adapt_python_pattern(pattern: &str) -> String {
     // Python's global `(?a)` flag makes shorthand classes and word boundaries ASCII-only.
     // fancy-regex rejects disabling Unicode, so remove `a` and expand those shorthands.
-    let mut adapted = pattern.to_owned();
-    let mut global_ascii = false;
-    if let Some(flags_end) = pattern.strip_prefix("(?").and_then(|rest| rest.find(')')) {
-        let flags = &pattern[2..flags_end + 2];
-        if !flags.is_empty()
-            && flags.chars().all(|flag| "aiLmsux-".contains(flag))
-            && flags.contains('a')
-        {
-            if flags.contains('u') {
-                return pattern.into();
-            }
-            let rust_flags: String = flags.chars().filter(|flag| *flag != 'a').collect();
-            let remainder = &pattern[flags_end + 3..];
-            adapted = if rust_flags.is_empty() {
-                remainder.to_owned()
-            } else {
-                format!("(?{rust_flags}){remainder}")
-            };
-            global_ascii = true;
-        }
-    }
-    let adapted = adapt_ascii_scopes(&adapted);
-    if global_ascii {
-        ascii_character_classes(&adapted)
-    } else {
-        adapted
-    }
-}
-
-fn adapt_ascii_scopes(pattern: &str) -> String {
-    let Some(start) = find_ascii_scope(pattern) else {
-        return pattern.into();
+    let Some((flags, remainder)) = global_flags(pattern) else {
+        return adapt_fragment(pattern, false, false, false).0;
     };
-    let body_start = start + "(?a:".len();
-    let Some(end) = find_group_end(pattern, body_start) else {
+    if invalid_python_flags(flags) {
         return pattern.into();
-    };
+    }
+    let ascii_mode = flags.contains('a');
+    let verbose_mode = flags.contains('x');
+    let rust_flags: String = flags
+        .chars()
+        .filter(|flag| !matches!(flag, 'a' | 'u'))
+        .collect();
     let mut output = String::with_capacity(pattern.len());
-    output.push_str(&pattern[..start]);
-    output.push_str("(?:");
-    output.push_str(&ascii_character_classes(&adapt_ascii_scopes(
-        &pattern[body_start..end],
-    )));
-    output.push(')');
-    output.push_str(&adapt_ascii_scopes(&pattern[end + 1..]));
+    if !rust_flags.is_empty() {
+        output.push_str(&format!("(?{rust_flags})"));
+    }
+    output.push_str(&adapt_fragment(remainder, ascii_mode, verbose_mode, false).0);
     output
 }
 
-fn find_ascii_scope(pattern: &str) -> Option<usize> {
-    let mut escaped = false;
-    let mut in_class = false;
-    for (index, ch) in pattern.char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        if ch == '\\' {
-            escaped = true;
-            continue;
-        }
-        if ch == '[' {
-            in_class = true;
-            continue;
-        }
-        if ch == ']' {
-            in_class = false;
-            continue;
-        }
-        if !in_class && pattern[index..].starts_with("(?a:") {
-            return Some(index);
-        }
+fn global_flags(pattern: &str) -> Option<(&str, &str)> {
+    let rest = pattern.strip_prefix("(?")?;
+    let end = rest.find(')')?;
+    let flags = &rest[..end];
+    if flags.is_empty() || !flags.chars().all(|flag| "aiLmsux".contains(flag)) {
+        return None;
     }
-    None
+    Some((flags, &rest[end + 1..]))
 }
 
-fn find_group_end(pattern: &str, body_start: usize) -> Option<usize> {
-    let mut depth = 1;
-    let mut escaped = false;
-    let mut in_class = false;
-    for (offset, ch) in pattern[body_start..].char_indices() {
-        if escaped {
-            escaped = false;
-            continue;
-        }
-        if ch == '\\' {
-            escaped = true;
-            continue;
-        }
-        if ch == '[' {
-            in_class = true;
-            continue;
-        }
-        if ch == ']' {
-            in_class = false;
-            continue;
-        }
-        if in_class {
-            continue;
-        }
-        if ch == '(' {
-            depth += 1;
-        } else if ch == ')' {
-            depth -= 1;
-            if depth == 0 {
-                return Some(body_start + offset);
-            }
-        }
-    }
-    None
+fn invalid_python_flags(flags: &str) -> bool {
+    flags.contains('L') || (flags.contains('a') && flags.contains('u'))
 }
 
-fn ascii_character_classes(pattern: &str) -> String {
+fn adapt_fragment(
+    pattern: &str,
+    ascii_mode: bool,
+    verbose_mode: bool,
+    stop_at_close: bool,
+) -> (String, usize) {
     const WORD_BOUNDARY: &str =
         "(?:(?<![A-Za-z0-9_])(?=[A-Za-z0-9_])|(?<=[A-Za-z0-9_])(?![A-Za-z0-9_]))";
     const NON_WORD_BOUNDARY: &str = "(?:(?=[\\s\\S])|(?<=[\\s\\S]))(?:(?<=[A-Za-z0-9_])(?=[A-Za-z0-9_])|(?<![A-Za-z0-9_])(?![A-Za-z0-9_]))";
-    let chars: Vec<char> = pattern.chars().collect();
     let mut output = String::with_capacity(pattern.len());
-    let mut in_class = false;
+    let mut ordinary_depth: usize = 0;
+    let mut index = 0;
+    while index < pattern.len() {
+        let ch = pattern[index..]
+            .chars()
+            .next()
+            .expect("valid character boundary");
+        let char_len = ch.len_utf8();
+        if verbose_mode && ch == '#' {
+            let comment_end = pattern[index..]
+                .find('\n')
+                .map_or(pattern.len(), |offset| index + offset + 1);
+            output.push_str(&pattern[index..comment_end]);
+            index = comment_end;
+            continue;
+        }
+        if ch == '[' {
+            let Some(class_end) = character_class_end(&pattern[index..]) else {
+                output.push_str(&pattern[index..]);
+                return (output, pattern.len());
+            };
+            let class = &pattern[index..index + class_end];
+            if ascii_mode {
+                output.push_str(&adapt_ascii_class(class));
+            } else {
+                output.push_str(class);
+            }
+            index += class_end;
+            continue;
+        }
+        if ch == '(' {
+            if let Some((body_start, flags)) = scoped_flags(pattern, index) {
+                let (enabled, disabled) = flags.split_once('-').unwrap_or((flags, ""));
+                let invalid = flags.matches('-').count() > 1
+                    || invalid_python_flags(enabled)
+                    || disabled.chars().any(|flag| matches!(flag, 'a' | 'u' | 'L'));
+                let inner_ascii = if invalid {
+                    ascii_mode
+                } else if enabled.contains('a') {
+                    true
+                } else if enabled.contains('u') {
+                    false
+                } else {
+                    ascii_mode
+                };
+                let inner_verbose = if enabled.contains('x') {
+                    true
+                } else if disabled.contains('x') {
+                    false
+                } else {
+                    verbose_mode
+                };
+                let rust_flags: String = if invalid {
+                    flags.into()
+                } else {
+                    flags
+                        .chars()
+                        .filter(|flag| !matches!(flag, 'a' | 'u'))
+                        .collect()
+                };
+                output.push_str("(?");
+                output.push_str(&rust_flags);
+                output.push(':');
+                let (body, body_end) =
+                    adapt_fragment(&pattern[body_start..], inner_ascii, inner_verbose, true);
+                output.push_str(&body);
+                if body_end == pattern[body_start..].len() {
+                    return (output, pattern.len());
+                }
+                output.push(')');
+                index = body_start + body_end + 1;
+                continue;
+            }
+            ordinary_depth += 1;
+            output.push(ch);
+            index += char_len;
+            continue;
+        }
+        if ch == ')' {
+            if ordinary_depth == 0 && stop_at_close {
+                return (output, index);
+            }
+            ordinary_depth = ordinary_depth.saturating_sub(1);
+            output.push(ch);
+            index += char_len;
+            continue;
+        }
+        if ch == '\\' {
+            let escaped_start = index + char_len;
+            let Some(escaped) = pattern[escaped_start..].chars().next() else {
+                output.push(ch);
+                return (output, pattern.len());
+            };
+            let replacement = if ascii_mode {
+                match escaped {
+                    'w' => Some("[A-Za-z0-9_]"),
+                    'W' => Some("[^A-Za-z0-9_]"),
+                    'd' => Some("[0-9]"),
+                    'D' => Some("[^0-9]"),
+                    's' => Some("[ \\t\\n\\r\\f\\v]"),
+                    'S' => Some("[^ \\t\\n\\r\\f\\v]"),
+                    'b' => Some(WORD_BOUNDARY),
+                    'B' => Some(NON_WORD_BOUNDARY),
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            if let Some(replacement) = replacement {
+                output.push_str(replacement);
+            } else {
+                output.push(ch);
+                output.push(escaped);
+            }
+            index = escaped_start + escaped.len_utf8();
+            continue;
+        }
+        output.push(ch);
+        index += char_len;
+    }
+    (output, pattern.len())
+}
+
+fn scoped_flags(pattern: &str, start: usize) -> Option<(usize, &str)> {
+    if !pattern[start..].starts_with("(?") {
+        return None;
+    }
+    let flags_start = start + 2;
+    let mut saw_flag = false;
+    for (offset, ch) in pattern[flags_start..].char_indices() {
+        if ch == ':' {
+            return saw_flag.then_some((
+                flags_start + offset + 1,
+                &pattern[flags_start..flags_start + offset],
+            ));
+        }
+        if !"aiLmsux-".contains(ch) {
+            return None;
+        }
+        saw_flag |= ch != '-';
+    }
+    None
+}
+
+fn character_class_end(class: &str) -> Option<usize> {
+    let mut escaped = false;
+    let mut first = true;
+    for (offset, ch) in class[1..].char_indices() {
+        if escaped {
+            escaped = false;
+            first = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if first && ch == '^' {
+            continue;
+        }
+        if ch == ']' && !first {
+            return Some(offset + 2);
+        }
+        first = false;
+    }
+    None
+}
+
+fn adapt_ascii_class(class: &str) -> String {
+    let mut content = &class[1..class.len() - 1];
+    let negated = content.starts_with('^');
+    if negated {
+        content = &content[1..];
+    }
+    let chars: Vec<char> = content.chars().collect();
+    let mut base = String::with_capacity(content.len());
+    let mut complements = Vec::new();
     let mut index = 0;
     while index < chars.len() {
-        let ch = chars[index];
-        if ch == '[' {
-            in_class = true;
-            output.push(ch);
+        if chars[index] != '\\' || index + 1 == chars.len() {
+            base.push(chars[index]);
             index += 1;
             continue;
         }
-        if ch == ']' && in_class {
-            in_class = false;
-            output.push(ch);
-            index += 1;
-            continue;
-        }
-        if ch != '\\' || index + 1 == chars.len() {
-            output.push(ch);
-            index += 1;
-            continue;
-        }
-        let escaped = chars[index + 1];
-        let replacement = if in_class {
-            match escaped {
-                'w' => Some("A-Za-z0-9_"),
-                'd' => Some("0-9"),
-                's' => Some(" \\t\\n\\r\\f\\v"),
-                _ => None,
+        match chars[index + 1] {
+            'w' => base.push_str("A-Za-z0-9_"),
+            'd' => base.push_str("0-9"),
+            's' => base.push_str(" \\t\\n\\r\\f\\v"),
+            'W' => complements.push("A-Za-z0-9_"),
+            'D' => complements.push("0-9"),
+            'S' => complements.push(" \\t\\n\\r\\f\\v"),
+            escaped => {
+                base.push('\\');
+                base.push(escaped);
             }
-        } else {
-            match escaped {
-                'w' => Some("[A-Za-z0-9_]"),
-                'W' => Some("[^A-Za-z0-9_]"),
-                'd' => Some("[0-9]"),
-                'D' => Some("[^0-9]"),
-                's' => Some("[ \\t\\n\\r\\f\\v]"),
-                'S' => Some("[^ \\t\\n\\r\\f\\v]"),
-                'b' => Some(WORD_BOUNDARY),
-                'B' => Some(NON_WORD_BOUNDARY),
-                _ => None,
-            }
-        };
-        if let Some(replacement) = replacement {
-            output.push_str(replacement);
-        } else {
-            output.push('\\');
-            output.push(escaped);
         }
         index += 2;
     }
+    if complements.is_empty() {
+        return format!("[{}{base}]", if negated { "^" } else { "" });
+    }
+    if !negated {
+        let mut alternatives = Vec::new();
+        if !base.is_empty() {
+            alternatives.push(format!("[{base}]"));
+        }
+        alternatives.extend(complements.into_iter().map(|set| format!("[^{set}]")));
+        return if alternatives.len() == 1 {
+            alternatives.pop().expect("one alternative")
+        } else {
+            format!("(?:{})", alternatives.join("|"))
+        };
+    }
+    let mut output = String::from("(?:");
+    if !base.is_empty() {
+        output.push_str(&format!("(?![{base}])"));
+    }
+    for set in complements {
+        output.push_str(&format!("(?=[{set}])"));
+    }
+    output.push_str("[\\s\\S])");
     output
 }
 
