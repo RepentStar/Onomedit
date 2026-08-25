@@ -1,17 +1,13 @@
-# Python
+# 本地遗留环境（不属于 Rust 发布内容）
+.venv/
+.pytest_cache/
 __pycache__/
 *.py[cod]
-.venv/
-venv/
-.pytest_cache/
-.coverage
-htmlcov/
 
 # 构建产物
 dist/
 build/
 target/
-*.egg-info/
 
 # 运行时状态（Codewhale / 本地工具）
 .codewhale/
@@ -19,3 +15,6 @@ target/
 # 编辑器
 .vscode/
 .idea/
+
+# docs
+docs/

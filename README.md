@@ -2,7 +2,7 @@
 
 Onomedit 是一个借助你熟悉的文本编辑器批量重命名文件和文件夹的工具，提供 CLI 和 GUI 两种使用方式。
 
-> `rust` 分支已经使用 Rust 实现应用、CLI 和 GUI。发布程序是原生 Windows 可执行文件，不需要安装 Python；仓库中的 Python 源码和测试目前只作为迁移期兼容性 oracle 保留。
+> `rust` 分支已经使用 Rust 实现应用、CLI、GUI 和测试辅助程序。发布程序是原生 Windows 可执行文件，构建、测试和运行均不需要 Python。
 
 它会把待处理名称按“一行一个”写进临时文件，打开记事本、VS Code、Vim 等外部编辑器；你可以使用编辑器已有的多光标、列编辑、查找替换或宏，保存并退出后，Onomedit 再安全地执行重命名。
 
@@ -721,6 +721,12 @@ onomedit config set safety.sanitize false
 
 恢复依赖日志和当前文件状态，不是文件内容备份。它只能撤销路径变化，不能恢复被其他程序删除或覆盖的内容。
 
+### 从旧版升级与回滚
+
+Rust 版继续使用 v1 `config.json` 和同一套 `last.log`、`history.log`、`error.log` 格式，不需要转换配置或日志。升级前如需保守备份，可复制整个 `%APPDATA%\Onomedit` 目录。
+
+需要回滚时，先退出 Onomedit，再用上一份 Python 构建的发布程序替换可执行文件；不要删除配置和日志目录。两代程序可以读取相同格式，但回滚前仍建议保留该目录副本，以免后续重命名会话覆盖 `last.log`。
+
 ## 常见问题
 
 ### 编辑器一闪而过，没有等待保存
@@ -771,8 +777,6 @@ cargo clippy --workspace --no-default-features --all-targets -- -D warnings
 cargo test --workspace
 cargo test --workspace --no-default-features
 ```
-
-迁移期间如需验证 Python oracle，可另外安装 uv 并运行 `uv run pytest`；这不是构建或运行 Rust 程序的前置条件。
 
 Windows release 构建及发布物 E2E：
 

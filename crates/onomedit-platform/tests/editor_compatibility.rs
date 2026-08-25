@@ -3,12 +3,20 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 #[cfg(windows)]
 use std::sync::Mutex;
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use serde::Deserialize;
 
 #[cfg(windows)]
 static ENVIRONMENT_LOCK: Mutex<()> = Mutex::new(());
+
+struct TestEditor {
+    _directory: tempfile::TempDir,
+    executable: PathBuf,
+}
+
+static TEST_EDITOR: OnceLock<TestEditor> = OnceLock::new();
 
 #[derive(Debug, Deserialize)]
 struct Fixture {
@@ -54,31 +62,37 @@ fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-fn available_python(repo: &Path) -> PathBuf {
-    if let Some(configured) = std::env::var_os("ONOMEDIT_TEST_PYTHON") {
-        return PathBuf::from(configured);
-    }
-
-    #[cfg(windows)]
-    let local = repo.join(".venv/Scripts/python.exe");
-    #[cfg(not(windows))]
-    let local = repo.join(".venv/bin/python");
-    if local.is_file() {
-        return local;
-    }
-
-    #[cfg(windows)]
-    let candidates = ["python"];
-    #[cfg(not(windows))]
-    let candidates = ["python3", "python"];
-
-    for candidate in candidates {
-        if Command::new(candidate).arg("--version").output().is_ok() {
-            return PathBuf::from(candidate);
-        }
-    }
-
-    panic!("editor compatibility tests require Python on PATH or ONOMEDIT_TEST_PYTHON");
+fn test_editor() -> &'static Path {
+    &TEST_EDITOR
+        .get_or_init(|| {
+            let directory = tempfile::tempdir().expect("create fake editor build directory");
+            let source =
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/support/fake_editor.rs");
+            let executable = directory.path().join(if cfg!(windows) {
+                "fake editor.exe"
+            } else {
+                "fake editor"
+            });
+            let output = Command::new("rustc")
+                .arg("--edition=2024")
+                .arg("-O")
+                .arg(&source)
+                .arg("-o")
+                .arg(&executable)
+                .output()
+                .expect("launch rustc for fake editor");
+            assert!(
+                output.status.success(),
+                "failed to compile {}:\n{}",
+                source.display(),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            TestEditor {
+                _directory: directory,
+                executable,
+            }
+        })
+        .executable
 }
 
 fn command_arg(value: &str) -> String {
@@ -115,9 +129,7 @@ fn shared_editor_split_cases_match_expected_behavior() {
 fn shared_editor_launch_cases_match_expected_behavior() {
     #[cfg(windows)]
     let _environment_guard = ENVIRONMENT_LOCK.lock().expect("lock process environment");
-    let repo = repo_root();
-    let python = available_python(&repo);
-    let fake_editor = repo.join("tests/fakeditor.py");
+    let fake_editor = test_editor();
 
     for case in load_fixture().launch_cases {
         let temp = tempfile::tempdir().expect("create temporary directory");
@@ -127,7 +139,6 @@ fn shared_editor_launch_cases_match_expected_behavior() {
             .expect("read initial edit file signature");
 
         let mut parts = vec![
-            command_arg(&python.to_string_lossy()),
             command_arg(&fake_editor.to_string_lossy()),
             command_arg(&case.mode),
         ];
@@ -240,9 +251,7 @@ fn shared_windows_editor_command_cases_match_expected_behavior() {
 #[test]
 fn known_single_instance_editor_waits_after_a_slow_launcher_exit() {
     let _environment_guard = ENVIRONMENT_LOCK.lock().expect("lock process environment");
-    let repo = repo_root();
-    let python = available_python(&repo);
-    let fake_editor = repo.join("tests/fakeditor.py");
+    let fake_editor = test_editor();
     let temp = tempfile::tempdir().expect("create temporary directory");
     let edit_path = temp.path().join("edit.txt");
     fs::write(&edit_path, "line1\n").expect("write initial edit file");
@@ -252,8 +261,7 @@ fn known_single_instance_editor_waits_after_a_slow_launcher_exit() {
     fs::write(
         &script,
         format!(
-            "@echo off\r\n\"{}\" \"{}\" slow-launcher-delay 2.1 0.2 \"%~1\"\r\n",
-            python.display(),
+            "@echo off\r\n\"{}\" slow-launcher-delay 2.1 0.2 \"%~1\"\r\n",
             fake_editor.display()
         ),
     )
