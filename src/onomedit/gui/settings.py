@@ -19,7 +19,9 @@ class SettingsWindow(tk.Toplevel):
         self.cfg = cfg or config_mod.load_config()
         set_language(self.cfg.language)
         self.title(tr("Onomedit 设置"))
-        self.resizable(False, False)
+        # 设置项会随功能增加而变长。允许调整窗口，并由滚动区域保证在小屏幕
+        # 或高 DPI 环境下底部按钮始终可达。
+        self.resizable(True, True)
         self._vars: dict[str, tk.Variable] = {}
         self._build()
         self.transient(master)
@@ -27,8 +29,35 @@ class SettingsWindow(tk.Toplevel):
 
     def _build(self) -> None:
         pad = {"padx": 8, "pady": 4}
-        body = ttk.Frame(self, padding=10)
-        body.pack(fill="both", expand=True)
+        viewport = ttk.Frame(self, padding=(10, 10, 10, 0))
+        viewport.pack(fill="both", expand=True)
+
+        style = ttk.Style(self)
+        self._canvas = tk.Canvas(
+            viewport,
+            borderwidth=0,
+            highlightthickness=0,
+            background=style.lookup("TFrame", "background"),
+        )
+        scrollbar = ttk.Scrollbar(
+            viewport, orient="vertical", command=self._canvas.yview
+        )
+        self._canvas.configure(yscrollcommand=scrollbar.set)
+        self._canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        body = ttk.Frame(self._canvas)
+        self._body_window = self._canvas.create_window(
+            (0, 0), window=body, anchor="nw"
+        )
+        body.bind("<Configure>", self._update_scroll_region)
+        self._canvas.bind("<Configure>", self._resize_scroll_body)
+
+        # 绑定在当前顶层窗口上，因此鼠标位于输入框、复选框等子控件时也能
+        # 滚动；窗口销毁后绑定会一并清理，不会影响主窗口。
+        self.bind("<MouseWheel>", self._on_mousewheel)
+        self.bind("<Button-4>", self._on_mousewheel)
+        self.bind("<Button-5>", self._on_mousewheel)
 
         locale_row = ttk.LabelFrame(body, text=tr("界面"), padding=8)
         locale_row.pack(fill="x", **pad)
@@ -112,8 +141,9 @@ class SettingsWindow(tk.Toplevel):
         self._check("preview.distance", tr("显示距离"), row5)
         self._check("safety.sanitize", tr("安全命名（非法字符/保留名/序号）"), row5)
 
-        btns = ttk.Frame(body)
-        btns.pack(fill="x", pady=(8, 0))
+        # 操作按钮不放进滚动区，窗口再矮也能保存或取消。
+        btns = ttk.Frame(self, padding=(10, 8, 10, 10))
+        btns.pack(fill="x")
         ttk.Button(btns, text=tr("保存"), command=self._save).pack(side="right", padx=4)
         ttk.Button(btns, text=tr("重置默认"), command=self._reset).pack(
             side="right", padx=4
@@ -121,6 +151,45 @@ class SettingsWindow(tk.Toplevel):
         ttk.Button(btns, text=tr("取消"), command=self.destroy).pack(
             side="right", padx=4
         )
+
+        self._fit_to_screen(body, btns, scrollbar)
+
+    def _fit_to_screen(
+        self, body: ttk.Frame, btns: ttk.Frame, scrollbar: ttk.Scrollbar
+    ) -> None:
+        """按内容设置初始大小，但为桌面边缘和窗口装饰预留空间。"""
+        self.update_idletasks()
+        max_width = max(360, self.winfo_screenwidth() - 80)
+        max_height = max(320, self.winfo_screenheight() - 120)
+        viewport_height = max(220, max_height - btns.winfo_reqheight() - 20)
+        canvas_width = min(
+            body.winfo_reqwidth(), max_width - scrollbar.winfo_reqwidth() - 20
+        )
+        canvas_height = min(body.winfo_reqheight(), viewport_height)
+        self._canvas.configure(width=canvas_width, height=canvas_height)
+        self.maxsize(max_width, max_height)
+
+    def _update_scroll_region(self, _event=None) -> None:
+        self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+
+    def _resize_scroll_body(self, event) -> None:
+        # 内容区始终与可视区等宽，避免窗口放大后各分组只占左侧一小块。
+        self._canvas.itemconfigure(self._body_window, width=event.width)
+
+    def _on_mousewheel(self, event) -> str:
+        if getattr(event, "num", None) == 4:
+            units = -1
+        elif getattr(event, "num", None) == 5:
+            units = 1
+        else:
+            delta = getattr(event, "delta", 0)
+            if not delta:
+                return "break"
+            units = -max(1, abs(delta) // 120) if delta > 0 else max(
+                1, abs(delta) // 120
+            )
+        self._canvas.yview_scroll(units, "units")
+        return "break"
 
     def _entry(self, key: str, label: str, parent: ttk.Frame) -> None:
         row = len(parent.grid_slaves()) // 2

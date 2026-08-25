@@ -87,10 +87,27 @@ def main() -> int:
     ), "开启差异/距离后所有列也应居中显示"
 
     sw = SettingsWindow(root)
+    sw.update_idletasks()
+    assert sw._canvas.cget("yscrollcommand"), "设置窗口应连接垂直滚动条"
+    scroll_region = tuple(float(x) for x in sw._canvas.cget("scrollregion").split())
+    assert scroll_region[3] > 0, "设置窗口滚动区域不应为空"
+
+    # 模拟小屏幕/较矮窗口：设置内容仍可滚动到底，底部操作栏不在 Canvas 内。
+    sw.geometry(f"{sw.winfo_width()}x360")
+    sw.update_idletasks()
+    top_view = sw._canvas.yview()
+    sw._canvas.yview_moveto(1.0)
+    bottom_view = sw._canvas.yview()
+    assert bottom_view[1] == 1.0 and bottom_view[0] > top_view[0], (
+        "较矮的设置窗口应能滚动到底"
+    )
 
     root.after(600, root.destroy)
     root.mainloop()
-    print("GUI 冒烟通过 ✔（窗口创建/默认全选/相对路径/列动态隐藏/目录展开）")
+    print(
+        "GUI 冒烟通过 ✔"
+        "（窗口创建/设置滚动/默认全选/相对路径/列动态隐藏/目录展开）"
+    )
     return 0
 
 
