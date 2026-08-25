@@ -12,7 +12,7 @@ edition = "2024"
 rust-version = "1.85"
 license = "MIT"
 authors = ["RepentStar <repent@repent.top>"]
-repository = "https://github.com/RepentStar/Onomedit"
+repository = "https://github.com/RepentStar/Onomeditpp"
 
 [workspace.dependencies]
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
