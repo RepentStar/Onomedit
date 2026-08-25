@@ -205,7 +205,7 @@ pub fn entry(arguments: impl IntoIterator<Item = OsString>, gui_available: bool)
             }
         }
         Command::Version => {
-            output_line!("onomedit {}", env!("CARGO_PKG_VERSION"));
+            output_line!("onomedit R{}", env!("CARGO_PKG_VERSION"));
             0
         }
         Command::Completion { shell } => {

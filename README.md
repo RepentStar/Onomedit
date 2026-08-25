@@ -595,7 +595,7 @@ onomedit gui
 
 ```powershell
 onomedit version
-# onomedit 0.1.6
+# onomedit R0.1.0
 ```
 
 ### `completion SHELL`

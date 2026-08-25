@@ -4,8 +4,8 @@
       "name": "version",
       "args": ["version"],
       "exit_code": 0,
-      "stdout": "onomedit 0.1.6\n",
-      "stdout_windows": "onomedit 0.1.6\r\n",
+      "stdout": "onomedit R0.1.0\n",
+      "stdout_windows": "onomedit R0.1.0\r\n",
       "stderr": ""
     },
     {
