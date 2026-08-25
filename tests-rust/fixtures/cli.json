@@ -114,5 +114,119 @@
       "exit_code": 2,
       "stdout": ""
     }
+  ],
+  "snapshots": [
+    {
+      "name": "help_root",
+      "args": ["help"],
+      "stdout_len": 823,
+      "stdout_fnv1a64": "c7afef241c95353a",
+      "stdout_windows_len": 845,
+      "stdout_windows_fnv1a64": "97307124a1bfdac8"
+    },
+    {
+      "name": "help_completion",
+      "args": ["help", "completion"],
+      "stdout_len": 660,
+      "stdout_fnv1a64": "23a725b6b9ea07ff",
+      "stdout_windows_len": 675,
+      "stdout_windows_fnv1a64": "7631a17e73d7210c"
+    },
+    {
+      "name": "help_config",
+      "args": ["help", "config"],
+      "stdout_len": 462,
+      "stdout_fnv1a64": "59fed866a0594839",
+      "stdout_windows_len": 479,
+      "stdout_windows_fnv1a64": "15d08f8fd6383990"
+    },
+    {
+      "name": "help_gui",
+      "args": ["help", "gui"],
+      "stdout_len": 119,
+      "stdout_fnv1a64": "8857890c1f3c7d92",
+      "stdout_windows_len": 125,
+      "stdout_windows_fnv1a64": "319c08348f769182"
+    },
+    {
+      "name": "help_help",
+      "args": ["help", "help"],
+      "stdout_len": 100,
+      "stdout_fnv1a64": "350795bb651b7475",
+      "stdout_windows_len": 104,
+      "stdout_windows_fnv1a64": "0fd949349a1ce8b3"
+    },
+    {
+      "name": "help_history",
+      "args": ["help", "history"],
+      "stdout_len": 204,
+      "stdout_fnv1a64": "08a2784345141794",
+      "stdout_windows_len": 214,
+      "stdout_windows_fnv1a64": "1a650a5a8ef847cc"
+    },
+    {
+      "name": "help_rename",
+      "args": ["help", "rename"],
+      "stdout_len": 2015,
+      "stdout_fnv1a64": "1bd86fe280676b9d",
+      "stdout_windows_len": 2049,
+      "stdout_windows_fnv1a64": "eba38176b164e0c9"
+    },
+    {
+      "name": "help_restore",
+      "args": ["help", "restore"],
+      "stdout_len": 347,
+      "stdout_fnv1a64": "ad6a5204ddabfd17",
+      "stdout_windows_len": 359,
+      "stdout_windows_fnv1a64": "84720774294ab245"
+    },
+    {
+      "name": "help_version",
+      "args": ["help", "version"],
+      "stdout_len": 72,
+      "stdout_fnv1a64": "7a4984ad1f4ccbb9",
+      "stdout_windows_len": 78,
+      "stdout_windows_fnv1a64": "8112ee4d4da9380f"
+    },
+    {
+      "name": "config_defaults",
+      "args": ["config"],
+      "normalize_config_path": true,
+      "normalize_editor": true,
+      "stdout_len": 717,
+      "stdout_fnv1a64": "2297b87c5f24ab5a",
+      "stdout_windows_len": 755,
+      "stdout_windows_fnv1a64": "b0f912b6e41c9668"
+    },
+    {
+      "name": "completion_bash",
+      "args": ["completion", "bash"],
+      "stdout_len": 1569,
+      "stdout_fnv1a64": "8323a1c9a5f0bcfa"
+    },
+    {
+      "name": "completion_zsh",
+      "args": ["completion", "zsh"],
+      "stdout_len": 1964,
+      "stdout_fnv1a64": "5e1240ea395939a3"
+    },
+    {
+      "name": "completion_pwsh",
+      "args": ["completion", "pwsh"],
+      "stdout_len": 2359,
+      "stdout_fnv1a64": "66c2ff74793483ee"
+    },
+    {
+      "name": "completion_fish",
+      "args": ["completion", "fish"],
+      "stdout_len": 2140,
+      "stdout_fnv1a64": "576a90bea9cdeaf6"
+    },
+    {
+      "name": "completion_psc",
+      "args": ["completion", "psc"],
+      "stdout_len": 5204,
+      "stdout_fnv1a64": "c13ce25cddd47c1f"
+    }
   ]
 }

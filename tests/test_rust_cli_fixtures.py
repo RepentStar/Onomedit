@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -32,6 +33,14 @@ def _run(args: list[str], config_root: Path, stdin: str | None = None):
     )
 
 
+def _fnv1a64(data: bytes) -> str:
+    value = 0xCBF29CE484222325
+    for byte in data:
+        value ^= byte
+        value = value * 0x100000001B3 & 0xFFFFFFFFFFFFFFFF
+    return f"{value:016x}"
+
+
 @pytest.mark.parametrize("case", _fixture()["cases"], ids=lambda case: case["name"])
 def test_shared_cli_golden(tmp_path, case):
     result = _run(case["args"], tmp_path / "config", case.get("stdin"))
@@ -48,6 +57,31 @@ def test_shared_cli_golden(tmp_path, case):
         assert value in stdout
     for value in case.get("stderr_contains", []):
         assert value in stderr
+
+
+@pytest.mark.parametrize("case", _fixture()["snapshots"], ids=lambda case: case["name"])
+def test_shared_cli_byte_snapshot(tmp_path, case):
+    config_root = tmp_path / "config"
+    result = _run(case["args"], config_root)
+    stdout = result.stdout
+    if case.get("normalize_config_path"):
+        config_path = str(config_root / "Onomedit" / "config.json").encode()
+        assert config_path in stdout
+        stdout = stdout.replace(config_path, b"<CONFIG_PATH>")
+    if case.get("normalize_editor"):
+        normalized = re.sub(
+            br'(?m)^  "editor": .*?(?P<cr>\r?)$',
+            br'  "editor": "<EDITOR>",\g<cr>',
+            stdout,
+        )
+        assert normalized != stdout
+        stdout = normalized
+
+    suffix = "_windows" if os.name == "nt" and "stdout_windows_len" in case else ""
+    assert result.returncode == 0
+    assert result.stderr == b""
+    assert len(stdout) == case[f"stdout{suffix}_len"]
+    assert _fnv1a64(stdout) == case[f"stdout{suffix}_fnv1a64"]
 
 
 def test_python_cli_rename_history_restore_workflow(tmp_path):

@@ -3,7 +3,7 @@ use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use clap::{Args, CommandFactory, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use onomedit_core::collection;
 use onomedit_core::config::{self, Config};
 use onomedit_core::journal::{RenameLogger, SEPARATOR};
@@ -188,17 +188,165 @@ pub fn entry(arguments: impl IntoIterator<Item = OsString>, gui_available: bool)
 }
 
 fn command_help(topic: Option<&str>) -> i32 {
-    let mut command = Cli::command();
+    if let Some(help) = help_text(topic) {
+        output_line!("{help}");
+        return 0;
+    }
     if let Some(topic) = topic {
-        if let Some(subcommand) = command.find_subcommand_mut(topic) {
-            output_line!("{}", subcommand.render_long_help());
-            return 0;
-        }
         error_line!("未知子命令: {topic}（可执行 onomedit help 查看全部）");
         return 1;
     }
-    output_line!("{}", command.render_long_help());
-    0
+    unreachable!("root help is always defined")
+}
+
+fn help_text(topic: Option<&str>) -> Option<&'static str> {
+    Some(match topic {
+        None => {
+            r#"usage: onomedit <子命令> ...
+
+结合外部编辑器进行批量文件重命名的工具
+
+positional arguments:
+  <子命令>
+    help      显示帮助信息（可指定子命令）
+    config    查看/设置配置
+    rename    编辑器模式批量重命名
+    restore   恢复重命名
+    history   查看重命名日志（最近一次）
+    gui       启动图形界面
+    version   版本信息
+    completion
+              生成 shell 补全脚本（pipe 到文件后配置）
+
+示例:
+  onomedit help                     查看本帮助
+  onomedit help rename              查看 rename 子命令帮助
+  onomedit config set-editor notepad  配置编辑器后即可开始
+  onomedit rename *.jpg --dry-run   预览（差异/距离），不执行
+  onomedit restore                  恢复上一次重命名"#
+        }
+        Some("completion") => {
+            r#"usage: onomedit completion {bash,zsh,pwsh,fish,psc}
+
+输出指定 shell 的补全脚本到 stdout；把 stdout 重定向到文件后配置到 shell。
+支持: bash, zsh, pwsh, fish, psc。
+
+positional arguments:
+  {bash,zsh,pwsh,fish,psc}
+                        目标 shell（bash / zsh / pwsh / fish）
+
+示例:
+  onomedit completion bash > ~/.local/share/bash-completion/completions/onomedit
+  onomedit completion zsh  > ~/.zfunc/_onomedit
+  onomedit completion pwsh > "$HOME\Documents\PowerShell\onomedit.ps1"
+  onomedit completion fish > ~/.config/fish/completions/onomedit.fish
+  onomedit completion psc  > "$HOME\Documents\PowerShell\onomedit.psc.ps1""#
+        }
+        Some("config") => {
+            r#"usage: onomedit config <操作> ...
+
+查看配置、按 KEY 设置任意项、设置编辑器、重置默认。
+
+positional arguments:
+  <操作>
+    set       按 KEY 设置配置项（config set KEY VALUE）
+    set-editor
+              设置编辑器命令
+    reset     重置默认配置
+
+示例:
+  onomedit config
+  onomedit config set path_type name
+  onomedit config set exclude.hidden false
+  onomedit config set-editor notepad
+  onomedit config reset"#
+        }
+        Some("gui") => {
+            r#"usage: onomedit gui
+
+启动图形界面（依赖 ttkbootstrap；未安装时给出提示）。
+
+示例:
+  onomedit gui"#
+        }
+        Some("help") => {
+            r#"usage: onomedit help [topic]
+
+positional arguments:
+  topic  子命令名（如 rename / restore）"#
+        }
+        Some("history") => {
+            r#"usage: onomedit history [--all]
+
+显示重命名记录（旧路径<-->新路径）；--all 显示全部历史。
+
+options:
+  --all  查看全部历史
+
+示例:
+  onomedit history
+  onomedit history --all"#
+        }
+        Some("rename") => {
+            r#"usage: onomedit rename [--dry-run] [--no-editor]
+                       [--path-type {full,name,stem,ext}] [--multi-tab]
+                       [--timeout TIMEOUT] [--sort-by KEY] [--reverse]
+                       [--depth N] [--exclude TYPE [TYPE ...]]
+                       [paths ...]
+
+把文件名列表写入临时文件并拉起编辑器；用户修改保存后读回并批量重命名。
+路径可含通配符；不提供路径时从剪贴板读取；若 stdin 来自管道则读其行作路径。
+
+positional arguments:
+  paths                 文件/目录路径（可含通配符）；缺省读剪贴板或 stdin 管道
+
+options:
+  --dry-run             仅预览（差异/距离），不执行
+  --no-editor           跳过编辑器（直接应用规则）
+  --path-type {full,name,stem,ext}
+                        覆盖路径类型
+  --multi-tab           多标签编辑器：直接轮询等保存
+  --timeout TIMEOUT     编辑器等待超时（秒）
+  --sort-by KEY         临时重命名顺序：default 原顺序、name 名称、path 路径、mtime 修改时间、ctime
+                        创建时间、size 大小
+  --reverse             临时反转重命名顺序：与 --sort-by 组合时按排序键降序，否则反转原顺序
+  --depth N             临时目录搜索深度：1 = 直接子项，0 = 不展开；指定时临时开启子文件夹展开
+  --exclude TYPE [TYPE ...]
+                        临时排除路径类型（可多次/多值）：f/file 文件、d/dir 目录、l/link
+                        符号链接、r/readonly 只读、h/hidden 隐藏、s/system 系统；在现有配置
+                        exclude.* 基础上追加
+
+示例:
+  onomedit rename a.txt b.txt
+  onomedit rename *.jpg --dry-run
+  onomedit rename --no-editor --path-type name  仅应用规则不拉起编辑器
+  onomedit rename *.txt --exclude h d --dry-run  临时排除隐藏文件与目录
+  dir /b *.jpg | onomedit rename  从管道读入路径（编辑模式下重命名）"#
+        }
+        Some("restore") => {
+            r#"usage: onomedit restore [--all] [--partial]
+
+按日志反向恢复：默认恢复最近一次；--all 恢复全部历史；--partial 在编辑器中筛选日志行。
+
+options:
+  --all      恢复全部历史
+  --partial  恢复部分（编辑器筛选日志行）
+
+示例:
+  onomedit restore
+  onomedit restore --all
+  onomedit restore --partial"#
+        }
+        Some("version") => {
+            r#"usage: onomedit version
+
+显示版本号。
+
+示例:
+  onomedit version"#
+        }
+        Some(_) => return None,
+    })
 }
 
 fn command_config(action: Option<ConfigAction>) -> i32 {

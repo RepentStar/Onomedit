@@ -8,6 +8,7 @@ use serde::Deserialize;
 #[derive(Debug, Deserialize)]
 struct Fixture {
     cases: Vec<Case>,
+    snapshots: Vec<Snapshot>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -24,6 +25,20 @@ struct Case {
     stdout_contains: Vec<String>,
     #[serde(default)]
     stderr_contains: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Snapshot {
+    name: String,
+    args: Vec<String>,
+    #[serde(default)]
+    normalize_config_path: bool,
+    #[serde(default)]
+    normalize_editor: bool,
+    stdout_len: usize,
+    stdout_fnv1a64: String,
+    stdout_windows_len: Option<usize>,
+    stdout_windows_fnv1a64: Option<String>,
 }
 
 fn fixture() -> Fixture {
@@ -51,6 +66,15 @@ fn run(args: &[impl AsRef<std::ffi::OsStr>], config_root: &Path, stdin: Option<&
     }
     drop(child.stdin.take());
     child.wait_with_output().unwrap()
+}
+
+fn fnv1a64(data: &[u8]) -> String {
+    let mut value = 0xcbf2_9ce4_8422_2325_u64;
+    for byte in data {
+        value ^= u64::from(*byte);
+        value = value.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{value:016x}")
 }
 
 #[test]
@@ -100,6 +124,58 @@ fn shared_cli_golden_cases_match() {
                 case.name
             );
         }
+    }
+}
+
+#[test]
+fn shared_cli_byte_snapshots_match() {
+    for snapshot in fixture().snapshots {
+        let directory = tempfile::tempdir().unwrap();
+        let config_root = directory.path().join("config");
+        let output = run(&snapshot.args, &config_root, None);
+        assert_eq!(output.status.code(), Some(0), "{} code", snapshot.name);
+        assert!(output.stderr.is_empty(), "{} stderr", snapshot.name);
+
+        let mut stdout = String::from_utf8(output.stdout).unwrap();
+        if snapshot.normalize_config_path {
+            let config_path = config_root.join("Onomedit").join("config.json");
+            let config_path = config_path.to_string_lossy();
+            assert!(
+                stdout.contains(config_path.as_ref()),
+                "{} omitted config path {config_path:?}",
+                snapshot.name
+            );
+            stdout = stdout.replace(config_path.as_ref(), "<CONFIG_PATH>");
+        }
+        if snapshot.normalize_editor {
+            let prefix = "  \"editor\": ";
+            let value_start = stdout.find(prefix).expect("editor line") + prefix.len();
+            let line_end = value_start
+                + stdout[value_start..]
+                    .find('\n')
+                    .expect("editor line terminator");
+            let value_end = value_start
+                + stdout[value_start..line_end]
+                    .rfind(',')
+                    .expect("editor value terminator");
+            stdout.replace_range(value_start..value_end, "\"<EDITOR>\"");
+        }
+        let bytes = stdout.as_bytes();
+        let expected_len = if cfg!(windows) {
+            snapshot.stdout_windows_len.unwrap_or(snapshot.stdout_len)
+        } else {
+            snapshot.stdout_len
+        };
+        let expected_hash = if cfg!(windows) {
+            snapshot
+                .stdout_windows_fnv1a64
+                .as_deref()
+                .unwrap_or(&snapshot.stdout_fnv1a64)
+        } else {
+            &snapshot.stdout_fnv1a64
+        };
+        assert_eq!(bytes.len(), expected_len, "{} byte length", snapshot.name);
+        assert_eq!(fnv1a64(bytes), expected_hash, "{} bytes", snapshot.name);
     }
 }
 
