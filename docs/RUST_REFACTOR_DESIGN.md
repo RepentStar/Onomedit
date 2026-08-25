@@ -203,7 +203,7 @@ onomedit CLI ─┘          ↑
 - `onomedit.exe`：带 GUI，双击或无参数启动 GUI，同时支持完整 CLI。
 - `onomedit-cli.exe`：不链接 GUI；执行 `gui` 或无参数时返回清晰的 GUI 不可用提示。
 
-Rust workspace 使用 `gui` feature 控制 GUI 依赖。CI 除 Windows 发布外，建议增加 Windows/macOS/Linux 的 core/CLI 测试矩阵；GUI 做编译测试和少量自动化 smoke test。
+Rust workspace 使用 `gui` feature 控制 GUI 依赖。当前 CI 仅运行 Windows 的 core/CLI、GUI 编译和少量自动化 smoke test；macOS/Linux core/CLI CI 暂缓，待 Windows 版本稳定后恢复。
 
 ## 7. GUI 重构原则
 
@@ -242,7 +242,7 @@ Rust workspace 使用 `gui` feature 控制 GUI 依赖。CI 除 Windows 发布外
 
 ### 8.4 平台与 GUI 验证
 
-- Windows/macOS/Linux 分别跑 core 与 CLI；大小写敏感行为不能只在一个平台模拟。
+- 当前仅在 Windows CI 跑 core 与 CLI；macOS/Linux 真实平台测试暂缓，恢复时仍需验证 POSIX 大小写敏感行为，不能只靠 Windows 模拟。
 - Windows 专测 CF_HDROP、隐藏/系统/只读位、`.cmd/.bat` 编辑器和窗口聚焦。
 - GUI 测试核心状态转换，人工 smoke 只负责原生对话框、拖拽、焦点和视觉可用性。
 
@@ -253,7 +253,7 @@ Rust workspace 使用 `gui` feature 控制 GUI 依赖。CI 除 Windows 发布外
 | 风险 | 影响 | 对策 |
 | --- | --- | --- |
 | Rust 正则方言与 Python `re` 不同 | 自动规则静默改名错误 | 封装引擎、替换串适配、差分语料；不支持案例阻断发布 |
-| `Path`/Unicode/大小写语义不同 | 去重、排序、冲突判断错误 | 平台路径键集中实现，真实 Windows/POSIX CI 验证 |
+| `Path`/Unicode/大小写语义不同 | 去重、排序、冲突判断错误 | 平台路径键集中实现；当前由 Windows CI 把关，POSIX CI 恢复后补真实平台验证 |
 | 遍历和 glob 默认行为不同 | 临时文件项目或顺序变化 | 不依赖库默认值，共享目录树 golden 测试 |
 | 编辑器进程模型不同 | 提前执行或等待过久 | 逐项复刻阈值和状态机，假编辑器端到端测试 |
 | diff 分块算法不同 | CLI/GUI 预览变化 | 移植兼容算法并做文本快照 |
