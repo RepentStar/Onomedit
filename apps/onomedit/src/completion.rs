@@ -1,3 +1,5 @@
+use crate::i18n::{Language, current};
+
 pub const SHELLS: [&str; 5] = ["bash", "zsh", "pwsh", "fish", "psc"];
 
 const BASH: &str = r#"# bash completion for onomedit
@@ -312,18 +314,50 @@ Register-ArgumentCompleter -CommandName onomedit, onomedit.exe -ScriptBlock {
 "#;
 
 pub fn generate(shell: &str) -> Option<String> {
-    match shell {
+    let script = match shell {
         "bash" => Some(BASH.to_owned()),
         "zsh" => Some(ZSH.to_owned()),
         "pwsh" => Some(PWSH.replace("@@TWO_SPACES@@", "  ")),
         "fish" => Some(FISH.to_owned()),
         "psc" => Some(PSC.to_owned()),
         _ => None,
+    }?;
+    if current() == Language::ZhCn {
+        return Some(script);
     }
+    let replacements = [
+        ("生成 shell 补全脚本", "Generate a shell completion script"),
+        ("查看/设置配置", "View/change configuration"),
+        ("启动图形界面", "Start the graphical interface"),
+        ("显示帮助信息", "Show help"),
+        ("查看重命名日志", "View rename history"),
+        ("编辑器模式批量重命名", "Batch rename in editor mode"),
+        ("恢复重命名", "Restore renames"),
+        ("版本信息", "Version information"),
+        ("完整路径", "Full path"),
+        ("仅文件名", "File name only"),
+        ("不含扩展名", "Without extension"),
+        ("仅扩展名", "Extension only"),
+        ("生成", "Generate"),
+        ("补全", "completion"),
+        ("安装", "Install"),
+    ];
+    Some(
+        replacements
+            .into_iter()
+            .fold(script, |text, (from, to)| text.replace(from, to)),
+    )
 }
 
 pub fn usage() -> &'static str {
-    "示例:\n  onomedit completion bash > ~/.local/share/bash-completion/completions/onomedit\n  onomedit completion zsh  > ~/.zfunc/_onomedit\n  onomedit completion pwsh > \"$HOME\\Documents\\PowerShell\\onomedit.ps1\"\n  onomedit completion fish > ~/.config/fish/completions/onomedit.fish\n  onomedit completion psc  > \"$HOME\\Documents\\PowerShell\\onomedit.psc.ps1\""
+    match current() {
+        Language::ZhCn => {
+            "示例:\n  onomedit completion bash > ~/.local/share/bash-completion/completions/onomedit\n  onomedit completion zsh  > ~/.zfunc/_onomedit\n  onomedit completion pwsh > \"$HOME\\Documents\\PowerShell\\onomedit.ps1\"\n  onomedit completion fish > ~/.config/fish/completions/onomedit.fish\n  onomedit completion psc  > \"$HOME\\Documents\\PowerShell\\onomedit.psc.ps1\""
+        }
+        Language::EnUs => {
+            "Examples:\n  onomedit completion bash > ~/.local/share/bash-completion/completions/onomedit\n  onomedit completion zsh  > ~/.zfunc/_onomedit\n  onomedit completion pwsh > \"$HOME\\Documents\\PowerShell\\onomedit.ps1\"\n  onomedit completion fish > ~/.config/fish/completions/onomedit.fish\n  onomedit completion psc  > \"$HOME\\Documents\\PowerShell\\onomedit.psc.ps1\""
+        }
+    }
 }
 
 #[cfg(test)]

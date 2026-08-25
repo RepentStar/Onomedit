@@ -11,6 +11,8 @@ use crate::path::PathType;
 use crate::rules::Rule;
 
 pub const CONFIG_VERSION: u32 = 1;
+pub const DEFAULT_LANGUAGE: &str = "zh-CN";
+pub const SUPPORTED_LANGUAGES: [&str; 2] = ["zh-CN", "en-US"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
@@ -59,6 +61,7 @@ impl Default for SafetyOptions {
 #[serde(default)]
 pub struct Config {
     pub version: u32,
+    pub language: String,
     pub editor: String,
     pub editor_alt: String,
     pub editor_timeout: f64,
@@ -86,6 +89,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             version: CONFIG_VERSION,
+            language: DEFAULT_LANGUAGE.into(),
             editor: String::new(),
             editor_alt: String::new(),
             editor_timeout: 120.0,
@@ -162,7 +166,9 @@ pub fn from_value(value: Value) -> Result<Config, ConfigError> {
             "config root is not an object".into(),
         ));
     }
-    Ok(serde_json::from_value(value)?)
+    let mut config: Config = serde_json::from_value(value)?;
+    config.language = normalize_language(&config.language).into();
+    Ok(config)
 }
 
 pub fn load() -> Config {
@@ -294,10 +300,37 @@ pub fn set_value(config: &mut Config, dotted: &str, raw: &str) -> Result<String,
     let old = current
         .get(*key)
         .ok_or_else(|| ConfigError::UnknownKey(dotted.into()))?;
-    let value = coerce(raw, old)?;
+    let mut value = coerce(raw, old)?;
+    if dotted == "language" {
+        let normalized = normalize_language(raw);
+        let supplied = raw.trim().replace('_', "-").to_ascii_lowercase();
+        if !matches!(
+            supplied.as_str(),
+            "zh" | "zh-cn" | "zh-hans" | "en" | "en-us"
+        ) {
+            return Err(ConfigError::InvalidValue(format!(
+                "unsupported language {raw:?}; choose from: {}",
+                SUPPORTED_LANGUAGES.join(", ")
+            )));
+        }
+        value = Value::String(normalized.into());
+    }
     current[*key] = value.clone();
     *config = serde_json::from_value(root)?;
     Ok(format!("{dotted} = {}", serde_json::to_string(&value)?))
+}
+
+pub fn normalize_language(language: &str) -> &'static str {
+    match language
+        .trim()
+        .replace('_', "-")
+        .to_ascii_lowercase()
+        .as_str()
+    {
+        "en" | "en-us" => "en-US",
+        "zh" | "zh-cn" | "zh-hans" => "zh-CN",
+        _ => DEFAULT_LANGUAGE,
+    }
 }
 
 fn coerce(raw: &str, current: &Value) -> Result<Value, ConfigError> {
@@ -334,6 +367,15 @@ mod tests {
         assert_eq!(config.editor, "vim");
         assert_eq!(config.path_type, PathType::Stem);
         assert!(config.exclude.hidden);
+        assert_eq!(config.language, "zh-CN");
+    }
+
+    #[test]
+    fn language_is_normalized_and_validated() {
+        let mut config = Config::default();
+        set_value(&mut config, "language", "en_US").unwrap();
+        assert_eq!(config.language, "en-US");
+        assert!(set_value(&mut config, "language", "fr-FR").is_err());
     }
 
     #[test]

@@ -529,6 +529,14 @@ onomedit config set exclude.hidden false
 onomedit config set shell_props '["尺寸","标题"]'
 ```
 
+界面和 CLI 支持简体中文与英文，默认使用简体中文。可以在 GUI 设置窗口选择语言，
+也可以通过命令持久切换；重新启动 Onomedit 后，所有窗口和后续命令都会使用新语言：
+
+```powershell
+onomedit config set language en-US  # English
+onomedit config set language zh-CN  # 简体中文
+```
+
 布尔值可用 `true/false`、`1/0`、`yes/no` 或 `on/off`。未知键或类型错误不会写入。
 
 #### `config set-editor COMMAND...`

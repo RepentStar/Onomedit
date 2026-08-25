@@ -193,10 +193,10 @@
       "args": ["config"],
       "normalize_config_path": true,
       "normalize_editor": true,
-      "stdout_len": 717,
-      "stdout_fnv1a64": "2297b87c5f24ab5a",
-      "stdout_windows_len": 755,
-      "stdout_windows_fnv1a64": "b0f912b6e41c9668"
+      "stdout_len": 740,
+      "stdout_fnv1a64": "08f6b39cba0376fa",
+      "stdout_windows_len": 779,
+      "stdout_windows_fnv1a64": "80c33a42501ccebd"
     },
     {
       "name": "completion_bash",
@@ -526,10 +526,10 @@
       "args": ["config"],
       "normalize_config_path": true,
       "normalize_editor": true,
-      "stdout_len": 717,
-      "stdout_fnv1a64": "2297b87c5f24ab5a",
-      "stdout_windows_len": 755,
-      "stdout_windows_fnv1a64": "b0f912b6e41c9668",
+      "stdout_len": 740,
+      "stdout_fnv1a64": "08f6b39cba0376fa",
+      "stdout_windows_len": 779,
+      "stdout_windows_fnv1a64": "80c33a42501ccebd",
       "backup_equals_initial": true,
       "config_unchanged": false
     },
@@ -539,10 +539,10 @@
       "args": ["config"],
       "normalize_config_path": true,
       "normalize_editor": false,
-      "stdout_len": 721,
-      "stdout_fnv1a64": "88c7ac0bac3f61bb",
-      "stdout_windows_len": 759,
-      "stdout_windows_fnv1a64": "adb3d2be07d91319",
+      "stdout_len": 744,
+      "stdout_fnv1a64": "73d38f50204249db",
+      "stdout_windows_len": 783,
+      "stdout_windows_fnv1a64": "c79dff27bd4333d0",
       "backup_equals_initial": false,
       "config_unchanged": true
     }

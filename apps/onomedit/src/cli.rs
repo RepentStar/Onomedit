@@ -12,6 +12,7 @@ use onomedit_core::pipeline::{PipelineOutcome, RenamePipeline, restore};
 use onomedit_platform::{clipboard, editor};
 
 use crate::completion;
+use crate::i18n::{Language, current, set_current};
 
 fn write_platform_line(mut writer: impl Write, arguments: std::fmt::Arguments<'_>) {
     let text = arguments.to_string();
@@ -139,17 +140,34 @@ struct RenameArgs {
 }
 
 pub fn entry(arguments: impl IntoIterator<Item = OsString>, gui_available: bool) -> i32 {
+    set_current(Language::from_code(&config::load().language));
     let arguments: Vec<OsString> = arguments.into_iter().collect();
     if arguments.is_empty() {
         if gui_available {
-            output_line!("启动 Onomedit 图形界面…");
-            output_line!(
-                "提示: 输入 onomedit help 查看全部子命令与用法；也可直接使用 CLI（如 onomedit rename *.txt --dry-run）"
-            );
+            match current() {
+                Language::ZhCn => {
+                    output_line!("启动 Onomedit 图形界面…");
+                    output_line!(
+                        "提示: 输入 onomedit help 查看全部子命令与用法；也可直接使用 CLI（如 onomedit rename *.txt --dry-run）"
+                    );
+                }
+                Language::EnUs => {
+                    output_line!("Starting the Onomedit graphical interface…");
+                    output_line!(
+                        "Tip: run onomedit help for commands and usage, or use the CLI directly (for example onomedit rename *.txt --dry-run)"
+                    );
+                }
+            }
             return launch_gui();
         }
         error_line!(
-            "错误: 当前为 CLI-only 版本，不包含 GUI；请使用 onomedit.exe 或指定 CLI 子命令"
+            "{}",
+            match current() {
+                Language::ZhCn =>
+                    "错误: 当前为 CLI-only 版本，不包含 GUI；请使用 onomedit.exe 或指定 CLI 子命令",
+                Language::EnUs =>
+                    "Error: this CLI-only build has no GUI; use onomedit.exe or specify a CLI command",
+            }
         );
         return 1;
     }
@@ -176,7 +194,13 @@ pub fn entry(arguments: impl IntoIterator<Item = OsString>, gui_available: bool)
             if gui_available {
                 launch_gui()
             } else {
-                error_line!("错误: 当前为 CLI-only 版本，不包含 GUI");
+                error_line!(
+                    "{}",
+                    match current() {
+                        Language::ZhCn => "错误: 当前为 CLI-only 版本，不包含 GUI",
+                        Language::EnUs => "Error: this build does not include the GUI",
+                    }
+                );
                 1
             }
         }
@@ -414,13 +438,21 @@ fn command_help(topic: Option<&str>) -> i32 {
         return 0;
     }
     if let Some(topic) = topic {
-        error_line!("未知子命令: {topic}（可执行 onomedit help 查看全部）");
+        match current() {
+            Language::ZhCn => error_line!("未知子命令: {topic}（可执行 onomedit help 查看全部）"),
+            Language::EnUs => {
+                error_line!("Unknown command: {topic} (run onomedit help to list commands)")
+            }
+        }
         return 1;
     }
     unreachable!("root help is always defined")
 }
 
 fn help_text(topic: Option<&str>) -> Option<&'static str> {
+    if current() == Language::EnUs {
+        return help_text_en(topic);
+    }
     Some(match topic {
         None => {
             r#"usage: onomedit <子命令> ...
@@ -570,17 +602,117 @@ options:
     })
 }
 
+fn localized_error(error: &impl std::fmt::Display) {
+    match current() {
+        Language::ZhCn => error_line!("错误: {error}"),
+        Language::EnUs => error_line!("Error: {error}"),
+    }
+}
+
+fn help_text_en(topic: Option<&str>) -> Option<&'static str> {
+    Some(match topic {
+        None => {
+            r#"usage: onomedit <command> ...
+
+Batch rename files with your external editor
+
+commands:
+  help        Show help (optionally for a command)
+  config      View or change configuration
+  rename      Batch rename in editor mode
+  restore     Restore renames
+  history     View rename history
+  gui         Start the graphical interface
+  version     Show version information
+  completion  Generate a shell completion script
+
+Examples:
+  onomedit help
+  onomedit help rename
+  onomedit config set language en-US
+  onomedit rename *.jpg --dry-run
+  onomedit restore"#
+        }
+        Some("completion") => {
+            r#"usage: onomedit completion {bash,zsh,pwsh,fish,psc}
+
+Write a completion script to stdout and redirect it to your shell's completion directory.
+
+Examples:
+  onomedit completion bash > ~/.local/share/bash-completion/completions/onomedit
+  onomedit completion zsh > ~/.zfunc/_onomedit
+  onomedit completion pwsh > "$HOME\Documents\PowerShell\onomedit.ps1""#
+        }
+        Some("config") => {
+            r#"usage: onomedit config <action> ...
+
+View configuration, set any key, configure the editor, or reset defaults.
+
+actions:
+  set         Set a value (config set KEY VALUE)
+  set-editor  Set the editor command
+  reset       Reset configuration defaults
+
+Examples:
+  onomedit config
+  onomedit config set language en-US
+  onomedit config set-editor notepad"#
+        }
+        Some("gui") => "usage: onomedit gui\n\nStart the graphical interface.",
+        Some("help") => {
+            "usage: onomedit help [topic]\n\ntopic  Command name (for example rename or restore)"
+        }
+        Some("history") => {
+            "usage: onomedit history [--all]\n\nShow rename records; --all shows all history."
+        }
+        Some("rename") => {
+            r#"usage: onomedit rename [--dry-run] [--no-editor]
+                       [--path-type {full,name,stem,ext}] [--multi-tab]
+                       [--timeout TIMEOUT] [--sort-by KEY] [--reverse]
+                       [--depth N] [--exclude TYPE [TYPE ...]]
+                       [paths ...]
+
+Write names to an edit file, open it in your editor, then apply the saved names.
+Paths may include globs; input defaults to the clipboard or piped stdin.
+
+options:
+  --dry-run      Preview without applying
+  --no-editor    Apply rules without opening the editor
+  --path-type    Override the path type
+  --multi-tab    Poll a multi-tab editor for saves
+  --timeout      Editor wait timeout in seconds
+  --sort-by      Temporary rename order
+  --reverse      Reverse the rename order
+  --depth        Temporary folder expansion depth
+  --exclude      Temporarily exclude path types"#
+        }
+        Some("restore") => {
+            "usage: onomedit restore [--all] [--partial]\n\nRestore the latest rename, all history, or entries selected in an editor."
+        }
+        Some("version") => "usage: onomedit version\n\nShow the version.",
+        Some(_) => return None,
+    })
+}
+
 fn command_config(action: Option<ConfigAction>) -> i32 {
     match action {
         None => {
             let config = config::load();
             match serde_json::to_string_pretty(&config) {
                 Ok(json) => {
-                    output_line!("{json}\n\n配置文件: {}", config::config_path().display());
+                    match current() {
+                        Language::ZhCn => {
+                            output_line!("{json}\n\n配置文件: {}", config::config_path().display())
+                        }
+                        Language::EnUs => output_line!(
+                            "{json}\n\nConfiguration file: {}",
+                            config::config_path().display()
+                        ),
+                    }
                     0
                 }
                 Err(error) => {
-                    error_line!("错误: {error}");
+                    localized_error(&error);
                     1
                 }
             }
@@ -592,14 +724,18 @@ fn command_config(action: Option<ConfigAction>) -> i32 {
                 Ok(description)
             }) {
                 Ok(description) => {
+                    if key == "language" {
+                        set_current(Language::from_code(&settings.language));
+                    }
                     output_line!("{description}");
                     0
                 }
                 Err(error) => {
-                    error_line!(
-                        "错误: {}",
-                        compatible_config_set_error(&key, &value, &error)
-                    );
+                    let error = compatible_config_set_error(&key, &value, &error);
+                    match current() {
+                        Language::ZhCn => error_line!("错误: {error}"),
+                        Language::EnUs => error_line!("Error: {error}"),
+                    }
                     1
                 }
             }
@@ -609,22 +745,28 @@ fn command_config(action: Option<ConfigAction>) -> i32 {
             settings.editor = command.join(" ");
             match config::save(&settings) {
                 Ok(()) => {
-                    output_line!("编辑器已设置为: {}", settings.editor);
+                    match current() {
+                        Language::ZhCn => output_line!("编辑器已设置为: {}", settings.editor),
+                        Language::EnUs => output_line!("Editor set to: {}", settings.editor),
+                    }
                     0
                 }
                 Err(error) => {
-                    error_line!("错误: {error}");
+                    localized_error(&error);
                     1
                 }
             }
         }
         Some(ConfigAction::Reset) => match config::save(&Config::default()) {
             Ok(()) => {
-                output_line!("配置已重置为默认值");
+                match current() {
+                    Language::ZhCn => output_line!("配置已重置为默认值"),
+                    Language::EnUs => output_line!("Configuration reset to defaults"),
+                }
                 0
             }
             Err(error) => {
-                error_line!("错误: {error}");
+                localized_error(&error);
                 1
             }
         },
@@ -719,12 +861,21 @@ fn command_rename(args: RenameArgs) -> i32 {
         paths = match collection::read_stream_paths(io::stdin().lock()) {
             Ok(paths) => paths,
             Err(error) => {
-                error_line!("错误: 无法读取管道: {error}");
+                match current() {
+                    Language::ZhCn => error_line!("错误: 无法读取管道: {error}"),
+                    Language::EnUs => error_line!("Error: could not read stdin: {error}"),
+                }
                 return 1;
             }
         };
         if paths.is_empty() {
-            error_line!("错误: 管道未提供任何路径");
+            error_line!(
+                "{}",
+                match current() {
+                    Language::ZhCn => "错误: 管道未提供任何路径",
+                    Language::EnUs => "Error: stdin did not provide any paths",
+                }
+            );
             return 1;
         }
     } else if paths.is_empty() {
@@ -738,12 +889,21 @@ fn command_rename(args: RenameArgs) -> i32 {
             .map_err(|error| error.to_string())?;
         if settings.open_editor {
             if settings.editor.trim().is_empty() {
-                return Err("未配置编辑器，请先运行: onomedit config set-editor <命令>\n（或使用 --no-editor 跳过编辑器）".to_owned());
+                return Err(match current() {
+                    Language::ZhCn => "未配置编辑器，请先运行: onomedit config set-editor <命令>\n（或使用 --no-editor 跳过编辑器）".to_owned(),
+                    Language::EnUs => "No editor is configured. Run: onomedit config set-editor <command>\n(or use --no-editor to skip the editor)".to_owned(),
+                });
             }
-            output_line!(
-                "已写入临时文件: {}\n请在编辑器中修改后保存并退出…",
-                session.edit_path().display()
-            );
+            match current() {
+                Language::ZhCn => output_line!(
+                    "已写入临时文件: {}\n请在编辑器中修改后保存并退出…",
+                    session.edit_path().display()
+                ),
+                Language::EnUs => output_line!(
+                    "Edit file created: {}\nEdit it, save, and close the editor…",
+                    session.edit_path().display()
+                ),
+            }
             let signature = session.signature().map_err(|error| error.to_string())?;
             editor::launch_and_wait(
                 &settings.editor,
@@ -783,7 +943,7 @@ fn command_rename(args: RenameArgs) -> i32 {
     let outcome = match outcome {
         Ok(outcome) => outcome,
         Err(error) => {
-            error_line!("错误: {error}");
+            localized_error(&error);
             if from_pipe {
                 error_line!("{}", pipe_hint());
             }
@@ -799,10 +959,16 @@ fn print_outcome(outcome: PipelineOutcome) -> i32 {
             for row in preview {
                 let mut extra = String::new();
                 if !row.diff.is_empty() {
-                    extra.push_str(&format!("  差异: {}", row.diff));
+                    extra.push_str(&match current() {
+                        Language::ZhCn => format!("  差异: {}", row.diff),
+                        Language::EnUs => format!("  Difference: {}", row.diff),
+                    });
                 }
                 if row.distance != 0 {
-                    extra.push_str(&format!("  距离: {}", row.distance));
+                    extra.push_str(&match current() {
+                        Language::ZhCn => format!("  距离: {}", row.distance),
+                        Language::EnUs => format!("  Distance: {}", row.distance),
+                    });
                 }
                 output_line!("{}  →  {}{extra}", row.old.display(), row.new.display());
             }
@@ -815,18 +981,40 @@ fn print_outcome(outcome: PipelineOutcome) -> i32 {
                 );
             }
         }
-        output_line!("（dry-run 预览，共 {} 项，未执行）", outcome.pairs.len());
+        match current() {
+            Language::ZhCn => {
+                output_line!("（dry-run 预览，共 {} 项，未执行）", outcome.pairs.len())
+            }
+            Language::EnUs => output_line!(
+                "(dry-run preview: {} items; not applied)",
+                outcome.pairs.len()
+            ),
+        }
         return 0;
     }
-    output_line!(
-        "重命名完成: 成功 {} / 失败 {} / 无变化 {} / 总计 {}",
-        outcome.result.success.len(),
-        outcome.result.failed.len(),
-        outcome.result.skipped.len(),
-        outcome.result.total()
-    );
+    match current() {
+        Language::ZhCn => output_line!(
+            "重命名完成: 成功 {} / 失败 {} / 无变化 {} / 总计 {}",
+            outcome.result.success.len(),
+            outcome.result.failed.len(),
+            outcome.result.skipped.len(),
+            outcome.result.total()
+        ),
+        Language::EnUs => output_line!(
+            "Rename complete: {} succeeded / {} failed / {} unchanged / {} total",
+            outcome.result.success.len(),
+            outcome.result.failed.len(),
+            outcome.result.skipped.len(),
+            outcome.result.total()
+        ),
+    }
     for (old, new, error) in &outcome.result.failed {
-        error_line!("失败: {} -> {}: {error}", old.display(), new.display());
+        match current() {
+            Language::ZhCn => error_line!("失败: {} -> {}: {error}", old.display(), new.display()),
+            Language::EnUs => {
+                error_line!("Failed: {} -> {}: {error}", old.display(), new.display())
+            }
+        }
     }
     i32::from(!outcome.result.failed.is_empty())
 }
@@ -846,20 +1034,36 @@ fn command_restore(all: bool, partial: bool) -> i32 {
     };
     match restore(&logger, all, selected_lines.as_deref()) {
         Ok(result) => {
-            output_line!(
-                "恢复完成: 成功 {} / 失败 {} / 无变化 {} / 总计 {}",
-                result.success.len(),
-                result.failed.len(),
-                result.skipped.len(),
-                result.total()
-            );
+            match current() {
+                Language::ZhCn => output_line!(
+                    "恢复完成: 成功 {} / 失败 {} / 无变化 {} / 总计 {}",
+                    result.success.len(),
+                    result.failed.len(),
+                    result.skipped.len(),
+                    result.total()
+                ),
+                Language::EnUs => output_line!(
+                    "Restore complete: {} succeeded / {} failed / {} unchanged / {} total",
+                    result.success.len(),
+                    result.failed.len(),
+                    result.skipped.len(),
+                    result.total()
+                ),
+            }
             for (old, new, error) in &result.failed {
-                error_line!("失败: {} -> {}: {error}", old.display(), new.display());
+                match current() {
+                    Language::ZhCn => {
+                        error_line!("失败: {} -> {}: {error}", old.display(), new.display())
+                    }
+                    Language::EnUs => {
+                        error_line!("Failed: {} -> {}: {error}", old.display(), new.display())
+                    }
+                }
             }
             i32::from(!result.failed.is_empty())
         }
         Err(error) => {
-            error_line!("错误: {error}");
+            localized_error(&error);
             1
         }
     }
@@ -868,11 +1072,21 @@ fn command_restore(all: bool, partial: bool) -> i32 {
 fn edit_restore_lines(logger: &RenameLogger) -> Result<Vec<String>, String> {
     let pairs = logger.read_last();
     if pairs.is_empty() {
-        return Err("没有可恢复的记录（最近一次日志为空）".into());
+        return Err(match current() {
+            Language::ZhCn => "没有可恢复的记录（最近一次日志为空）",
+            Language::EnUs => "Nothing to restore (the latest log is empty)",
+        }
+        .into());
     }
     let settings = config::load();
     if settings.editor.trim().is_empty() {
-        return Err("未配置编辑器，无法进行部分恢复（先 config set-editor）".into());
+        return Err(match current() {
+            Language::ZhCn => "未配置编辑器，无法进行部分恢复（先 config set-editor）",
+            Language::EnUs => {
+                "An editor is required for partial restore (run config set-editor first)"
+            }
+        }
+        .into());
     }
     let mut file = tempfile::Builder::new()
         .prefix("onomedit_restore_")
@@ -890,10 +1104,16 @@ fn edit_restore_lines(logger: &RenameLogger) -> Result<Vec<String>, String> {
     file.flush().map_err(|error| error.to_string())?;
     let signature =
         onomedit_core::edit_file::signature(file.path()).map_err(|error| error.to_string())?;
-    output_line!(
-        "请在编辑器中删去不想恢复的行，保存后退出…（{}）",
-        file.path().display()
-    );
+    match current() {
+        Language::ZhCn => output_line!(
+            "请在编辑器中删去不想恢复的行，保存后退出…（{}）",
+            file.path().display()
+        ),
+        Language::EnUs => output_line!(
+            "Delete entries you do not want to restore, then save and close the editor… ({})",
+            file.path().display()
+        ),
+    }
     editor::launch_and_wait(
         &settings.editor,
         file.path(),
@@ -913,7 +1133,13 @@ fn edit_restore_lines(logger: &RenameLogger) -> Result<Vec<String>, String> {
         .map(str::to_owned)
         .collect();
     if lines.len() > pairs.len() {
-        return Err("错误: 筛选后的行数超过原始行数，已中止".into());
+        return Err(match current() {
+            Language::ZhCn => "错误: 筛选后的行数超过原始行数，已中止",
+            Language::EnUs => {
+                "Error: the filtered list has more entries than the original; operation cancelled"
+            }
+        }
+        .into());
     }
     Ok(lines)
 }
@@ -926,7 +1152,13 @@ fn command_history(all: bool) -> i32 {
         logger.read_last()
     };
     if pairs.is_empty() {
-        output_line!("（空）");
+        output_line!(
+            "{}",
+            match current() {
+                Language::ZhCn => "（空）",
+                Language::EnUs => "(empty)",
+            }
+        );
     } else {
         for (old, new) in pairs {
             output_line!("{}{SEPARATOR}{}", old.display(), new.display());
@@ -936,7 +1168,11 @@ fn command_history(all: bool) -> i32 {
 }
 
 fn pipe_hint() -> &'static str {
-    if cfg!(windows) {
+    if current() == Language::EnUs && cfg!(windows) {
+        "Tip: piped relative paths are resolved from the current directory.\n  · Pipe full paths: Get-ChildItem C:\\dir | ForEach-Object FullName | onomedit rename …\n  · Or change directory first: cd C:\\dir; Get-ChildItem -Name | onomedit rename …\n  · Do not pipe PowerShell file objects directly; their table formatting cannot be parsed"
+    } else if current() == Language::EnUs {
+        "Tip: piped relative paths are resolved from the current directory.\n  · Pipe full paths: find /some/dir -maxdepth 1 | onomedit rename …\n  · Or change directory first: cd /some/dir; ls | onomedit rename …"
+    } else if cfg!(windows) {
         "提示: 管道里的路径解析失败——相对路径会按当前目录查找。\n  · 提供完整路径：Get-ChildItem C:\\dir | ForEach-Object FullName | onomedit rename …\n  · 或先 cd 到目标目录：cd C:\\dir; Get-ChildItem -Name | onomedit rename …\n  · 直接传 PowerShell 文件对象会渲染成带表头表格，无法解析"
     } else {
         "提示: 管道里的路径解析失败——相对路径会按当前目录查找。\n  · 提供完整路径：find /some/dir -maxdepth 1 | onomedit rename …\n  · 或先 cd 到目标目录：cd /some/dir; ls | onomedit rename …"
@@ -949,14 +1185,23 @@ fn launch_gui() -> i32 {
         match crate::gui::run() {
             Ok(()) => 0,
             Err(error) => {
-                error_line!("错误: 无法启动 GUI: {error}");
+                match current() {
+                    Language::ZhCn => error_line!("错误: 无法启动 GUI: {error}"),
+                    Language::EnUs => error_line!("Error: could not start the GUI: {error}"),
+                }
                 1
             }
         }
     }
     #[cfg(not(feature = "gui"))]
     {
-        error_line!("错误: 当前构建不包含 GUI");
+        error_line!(
+            "{}",
+            match current() {
+                Language::ZhCn => "错误: 当前构建不包含 GUI",
+                Language::EnUs => "Error: this build does not include the GUI",
+            }
+        );
         1
     }
 }
