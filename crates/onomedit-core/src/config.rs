@@ -232,6 +232,12 @@ pub fn ensure_default_editor(config: &mut Config) {
 }
 
 pub fn detect_default_editor() -> String {
+    let editor_from_env = env::var("EDITOR").unwrap_or_default();
+    let editor_from_env = editor_from_env.trim();
+    if !editor_from_env.is_empty() {
+        return editor_from_env.into();
+    }
+
     if cfg!(windows) {
         for (command, result) in [("notepad", "notepad"), ("code", "code -w")] {
             if command_exists(command) {
@@ -256,7 +262,6 @@ pub fn detect_default_editor() -> String {
                 return command.into();
             }
         }
-        return env::var("EDITOR").unwrap_or_default();
     }
     String::new()
 }

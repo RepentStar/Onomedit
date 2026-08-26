@@ -670,7 +670,7 @@ onomedit completion psc > "$HOME\Documents\PowerShell\onomedit.psc.ps1"
 | `auto_rules`        | `[]`      | 自动规则 JSON 数组                              |
 | `temp_dir`          | `""`      | 临时文件目录；空值使用系统临时目录              |
 
-首次探测编辑器的顺序：Windows 为记事本、VS Code；macOS 为 TextEdit、Sublime Text、VS Code、Vim；Linux 为 nano、vi、Kate，最后读取 `EDITOR` 环境变量。
+首次探测编辑器时，优先读取 `EDITOR` 环境变量。未设置时，Windows 依次尝试记事本、VS Code；macOS 依次尝试 TextEdit、Sublime Text、VS Code、Vim；Linux 依次尝试 nano、vi、Kate。
 
 ## GUI 功能说明
 
