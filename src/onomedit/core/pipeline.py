@@ -335,20 +335,20 @@ class RenamePipeline:
             if self.cfg.apply_rules:
                 if self.cfg.enable_auto_rules:
                     for rule in self.cfg.auto_rules:
-                        pi = PathItem(full)
+                        pi = PathItem(full, is_dir=item.is_dir)
                         value = pi.get_field(rule.scope)
                         value = rules.apply_rule(value, rule)
                         full = pi.with_field(rule.scope, value)
                 if self.cfg.enable_envvars:
                     # 环境变量作用于 name 段（目录段保持原样）
-                    pi = PathItem(full)
+                    pi = PathItem(full, is_dir=item.is_dir)
                     ctx = envvars.EnvContext(
                         file=item.full, clip_text=self.clipboard_text
                     )
                     new_name = env.expand(pi.name, context=ctx)
                     full = os.path.join(pi.directory, new_name)
             if self.cfg.safety.sanitize:
-                pi = PathItem(full)
+                pi = PathItem(full, is_dir=item.is_dir)
                 full = os.path.join(pi.directory, safename.sanitize_name(pi.name))
             pairs.append((item.full, full))
         return pairs

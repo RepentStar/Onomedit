@@ -23,6 +23,16 @@ def test_dotfile_segments():
     assert p.ext == ""
 
 
+def test_directory_with_dots_has_no_extension(tmp_path):
+    folder = tmp_path / "0ikj2.56234.345"
+    folder.mkdir()
+    item = PathItem(folder)
+    assert item.name == "0ikj2.56234.345"
+    assert item.stem == "0ikj2.56234.345"
+    assert item.ext == ""
+    assert Path(item.with_field("stem", "renamed.folder")) == tmp_path / "renamed.folder"
+
+
 def test_serialize_roundtrip_symmetric():
     for path in ("/d/a.b.txt", "/d/.hidden", "/d/noext", "/d/x"):
         for ptype in PATH_TYPES:

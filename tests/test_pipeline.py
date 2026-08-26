@@ -72,6 +72,29 @@ def test_full_flow_no_editor_applies_rules(tmp_path, isolated_config):
     assert (tmp_path / "alpha.txt").exists()
 
 
+def test_stem_mode_keeps_dotted_directory_name(tmp_path, isolated_config):
+    folder = tmp_path / "0ikj2.56234.345"
+    folder.mkdir()
+    cfg = _cfg(tmp_path, open_editor=False, expand_subdirs=False)
+    items, new_fulls, _ = RenamePipeline(cfg).prepare([str(folder)])
+    assert items[0].stem == folder.name
+    assert new_fulls == [str(folder)]
+
+
+def test_stem_rule_preserves_dotted_directory_name(tmp_path, isolated_config):
+    folder = tmp_path / "0ikj2.56234.345"
+    folder.mkdir()
+    cfg = _cfg(
+        tmp_path,
+        open_editor=False,
+        expand_subdirs=False,
+        auto_rules=[Rule(scope="stem", kind="replace", find="0ikj2", replace="folder")],
+    )
+    outcome = RenamePipeline(cfg).run_editor_mode([str(folder)])
+    assert outcome.result.success == [(str(folder), str(tmp_path / "folder.56234.345"))]
+    assert (tmp_path / "folder.56234.345").is_dir()
+
+
 def test_editor_exit_without_change_noop(tmp_path, isolated_config):
     """仅编辑器语义：编辑器未修改（退出）→ 全部无变化。"""
     paths = _make_files(tmp_path)

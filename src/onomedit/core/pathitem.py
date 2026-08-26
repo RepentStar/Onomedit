@@ -19,10 +19,12 @@ PATH_TYPES = (PATH_TYPE_FULL, PATH_TYPE_NAME, PATH_TYPE_STEM, PATH_TYPE_EXT)
 class PathItem:
     """封装单个文件路径，提供四段惰性属性与段级读写。"""
 
-    __slots__ = ("full",)
+    __slots__ = ("full", "is_dir")
 
-    def __init__(self, full: str | os.PathLike):
+    def __init__(self, full: str | os.PathLike, *, is_dir: bool | None = None):
         self.full = os.fspath(full)
+        # 编辑后的目标路径通常还不存在，因此允许调用方沿用源项目的类型。
+        self.is_dir = os.path.isdir(self.full) if is_dir is None else is_dir
 
     @property
     def directory(self) -> str:
@@ -34,11 +36,15 @@ class PathItem:
 
     @property
     def stem(self) -> str:
+        if self.is_dir:
+            return self.name
         return os.path.splitext(self.name)[0]
 
     @property
     def ext(self) -> str:
         """扩展名（含点，如 ``.txt``；无扩展名为空串）。"""
+        if self.is_dir:
+            return ""
         return os.path.splitext(self.name)[1]
 
     def get_field(self, scope: str) -> str:
