@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 
 SEPARATOR = "<-->"
@@ -66,7 +65,10 @@ class RenameLogger:
 
     def _append_history(self, line: str) -> None:
         self.log_dir.mkdir(parents=True, exist_ok=True)
-        if self.history_path.exists() and self.history_path.stat().st_size > ROTATE_BYTES:
+        if (
+            self.history_path.exists()
+            and self.history_path.stat().st_size > ROTATE_BYTES
+        ):
             self._rotate()
         self._append(self.history_path, line)
 

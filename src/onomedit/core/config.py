@@ -11,12 +11,12 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 
 from onomedit.core.pathitem import (
-    PATH_TYPE_EXT,
-    PATH_TYPE_FULL,
-    PATH_TYPE_NAME,
-    PATH_TYPE_STEM,
-    PATH_TYPES,
-)  # noqa: F401
+    PATH_TYPE_EXT as PATH_TYPE_EXT,
+    PATH_TYPE_FULL as PATH_TYPE_FULL,
+    PATH_TYPE_NAME as PATH_TYPE_NAME,
+    PATH_TYPE_STEM as PATH_TYPE_STEM,
+    PATH_TYPES as PATH_TYPES,
+)
 from onomedit.core.rules import rule_from_dict, rule_to_dict
 from onomedit.i18n import SUPPORTED_LANGUAGES, ZH_CN, normalize_language, tr
 
@@ -33,7 +33,6 @@ class ExcludeOptions:
     system: bool = True
 
 
-# ``rename --exclude`` 命令行 tag → ExcludeOptions 字段映射（别名成对）
 EXCLUDE_TAG_MAP: dict[str, str] = {
     "f": "files",
     "file": "files",
@@ -48,7 +47,6 @@ EXCLUDE_TAG_MAP: dict[str, str] = {
     "s": "system",
     "system": "system",
 }
-# argparse choices 用：全部合法 tag
 EXCLUDE_TAGS: tuple[str, ...] = tuple(EXCLUDE_TAG_MAP)
 
 
@@ -78,33 +76,25 @@ class SafetyOptions:
 @dataclass
 class Config:
     version: int = CONFIG_VERSION
-    # User-interface and CLI language (BCP-47 tag).
     language: str = ZH_CN
-    # 编辑器（主/备用）与等待
     editor: str = ""
     editor_alt: str = ""
     editor_timeout: float = 120.0
     multi_tab: bool = False
     open_editor: bool = True
     apply_rules: bool = True
-    # 路径类型（四档之一，默认"不带扩展名"）
     path_type: str = PATH_TYPE_STEM
-    # 重命名顺序（default 原顺序 / name / path / mtime / ctime / size）
     sort_by: str = "default"
-    # 反转重命名顺序（升序 → 降序；default 下反转收集顺序）
     sort_reverse: bool = False
     enable_envvars: bool = True
     enable_auto_rules: bool = True
-    # 子文件夹展开（默认开启，层级 10 ≈ 全递归）
     expand_subdirs: bool = True
     subdirs_depth: int = 10
     exclude: ExcludeOptions = field(default_factory=ExcludeOptions)
     preview: PreviewOptions = field(default_factory=PreviewOptions)
     safety: SafetyOptions = field(default_factory=SafetyOptions)
-    # GUI：完成后退出 / 跳过重命名确认
     exit_after: bool = True
     skip_confirmation: bool = True
-    # Shell 属性 / 自动替换规则 / 临时目录（空 = 系统临时）
     shell_props: list = field(default_factory=list)
     auto_rules: list = field(default_factory=list)
     temp_dir: str = ""
@@ -148,10 +138,8 @@ def detect_default_editor() -> str:
 
 
 def _detect_win_editor() -> str:
-    # 1) 系统自带记事本（优先，Windows 必定存在）
     if shutil.which("notepad"):
         return "notepad"
-    # 2) VSCode（-w 等待文件关闭）
     if shutil.which("code"):
         return "code -w"
     return ""

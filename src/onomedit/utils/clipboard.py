@@ -110,7 +110,12 @@ def _win_setup() -> tuple:
     kernel32.GlobalSize.restype = ctypes.c_size_t
     kernel32.GlobalUnlock.argtypes = [void_p]
     kernel32.GlobalUnlock.restype = ctypes.c_bool
-    shell32.DragQueryFileW.argtypes = [void_p, ctypes.c_uint, ctypes.c_wchar_p, ctypes.c_uint]
+    shell32.DragQueryFileW.argtypes = [
+        void_p,
+        ctypes.c_uint,
+        ctypes.c_wchar_p,
+        ctypes.c_uint,
+    ]
     shell32.DragQueryFileW.restype = ctypes.c_uint
     return user32, kernel32, shell32, void_p
 
@@ -119,7 +124,7 @@ def _win_get_text() -> str | None:
     """Windows 剪贴板文本读取（UTF-16）。"""
     import ctypes
 
-    user32, kernel32, _shell32, void_p = _win_setup()
+    user32, kernel32, _shell32, _void_p = _win_setup()
     if not user32.IsClipboardFormatAvailable(CF_UNICODETEXT):
         return None
     if not user32.OpenClipboard(None):

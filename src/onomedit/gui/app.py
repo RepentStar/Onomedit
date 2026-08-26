@@ -1,8 +1,4 @@
-"""主窗口：文件收集（拖拽/按钮/剪贴板）→ 后台线程编辑器流程 → 列表窗口确认。
-
-编辑器调用与等待必须在后台线程（避免冻结界面）；完成后经事件循环回主线程。
-恢复上次操作是主窗口的快捷按钮。拖拽依赖 tkinterdnd2（可选，缺失时用按钮）。
-"""
+"""GUI 主窗口与后台重命名流程。"""
 
 from __future__ import annotations
 
@@ -33,7 +29,7 @@ class MainWindow:
         self.root = root
         self.cfg = cfg or config_mod.load_config()
         set_language(self.cfg.language)
-        self.paths: list[str] = []  # 用户添加的原始路径（不展开）
+        self.paths: list[str] = []
         self._busy = False
         self._build()
         self._setup_dnd()
@@ -196,8 +192,6 @@ class MainWindow:
                 shown.extend(it.full for it in items)
             else:
                 shown.append(p)
-        # 展开结果可能重复（如同时添加目录 A 与其子目录 A\B、或手动添加的文件与目录内容重叠），
-        # 去重后再排序，避免同一路径在列表中（及随后的执行流中）出现两次
         items = collection.dedupe_items([PathItem(p) for p in shown])
         items = collection.sort_items(
             items, self.cfg.sort_by, reverse=self.cfg.sort_reverse
@@ -214,7 +208,6 @@ class MainWindow:
             return
         cfg = config_mod.load_config()
         cfg.path_type = self.path_type_var.get()
-        # 列表已按勾选状态展开显示；处理时不再重复展开（显示即最终列表）
         cfg.expand_subdirs = False
         cfg.subdirs_depth = int(self.depth_var.get() or 1)
         if no_editor:
@@ -232,14 +225,12 @@ class MainWindow:
                         lambda: self._status.configure(text=m)
                     ),
                 )
-                items, new_fulls, temp_path = pipeline.prepare(paths)
+                items, new_fulls, _temp_path = pipeline.prepare(paths)
                 pairs = pipeline.plan(items, new_fulls)
-                # 读取编辑结果后立即预检目标重名：发现重名 → 警告并中止（不执行）
                 if not dry_run:
                     conflicts = find_duplicate_targets(pairs)
                     if conflicts:
                         raise DuplicateTargetError(conflicts)
-                # 基准基于原始输入（展开前），保持「只显示到所选目录」语义
                 base = display_base(self.paths)
                 self._ui(
                     lambda: self._show_list(
@@ -250,9 +241,7 @@ class MainWindow:
                     )
                 )
             except Exception as e:  # noqa: BLE001 - 流程错误统一提示并恢复可操作
-                # 注意：except 变量 e 在块结束后即被删除，而 self._ui 是延迟到
-                # 主线程执行（root.after），必须在此立即绑定，否则闭包读取 e 时
-                # 抛 NameError: free variable 'e'（历史踩坑）。
+                # except 变量会在块结束时释放，须绑定到延迟回调的默认参数。
                 self._ui(lambda exc=e: self._finish_with_error(exc))
 
         threading.Thread(target=worker, daemon=True).start()
@@ -290,14 +279,7 @@ class MainWindow:
                 # 防御性兜底：worker 已预检，此处再触发则警告并中止且不退出
                 self._warn_duplicate_targets(e)
                 return
-            self._status.configure(
-                text=tr(
-                    "重命名完成: 成功 {success} / 失败 {failed} / 无变化 {skipped}",
-                    success=len(result.success),
-                    failed=len(result.failed),
-                    skipped=len(result.skipped),
-                )
-            )
+            self._show_result(result)
             self._maybe_exit_after()
             return
         ListWindow(
@@ -313,6 +295,10 @@ class MainWindow:
 
     def _on_rename_done(self, result) -> None:
         """确认窗口执行完成后的处理（状态栏 + 完成后退出）。"""
+        self._show_result(result)
+        self._maybe_exit_after()
+
+    def _show_result(self, result) -> None:
         self._status.configure(
             text=tr(
                 "重命名完成: 成功 {success} / 失败 {failed} / 无变化 {skipped}",
@@ -321,7 +307,6 @@ class MainWindow:
                 skipped=len(result.skipped),
             )
         )
-        self._maybe_exit_after()
 
     def _maybe_exit_after(self) -> None:
         """配置「完成后退出」开启时，短暂展示结果后关闭主窗口。"""
@@ -346,7 +331,6 @@ class MainWindow:
 
     def _open_settings(self) -> None:
         SettingsWindow(self.root, cfg=self.cfg)
-        # 保存后刷新本地配置并重排列表（排序依据等变更立即生效）
         self.cfg = config_mod.load_config()
         self._refresh()
 
@@ -356,12 +340,9 @@ class MainWindow:
 
 def main() -> None:
     """GUI 入口（供 CLI 的 gui 子命令调用）。"""
-    try:
-        import ttkbootstrap as tb
+    import ttkbootstrap as tb
 
-        root = tb.Window(themename="flatly")
-    except ImportError:  # pragma: no cover - CLI 已提示安装
-        raise
+    root = tb.Window(themename="flatly")
     MainWindow(root)
     root.mainloop()
 

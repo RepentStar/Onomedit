@@ -37,7 +37,9 @@ def read_stream_paths(stream=None) -> list[str]:
     return [line.strip() for line in stream if line.strip()]
 
 
-def collect_paths(raw_paths: list[str] | None, *, use_clipboard: bool = True) -> list[str]:
+def collect_paths(
+    raw_paths: list[str] | None, *, use_clipboard: bool = True
+) -> list[str]:
     """收集文件路径：参数优先，否则读剪贴板；过滤不存在的路径。
 
     Windows 上 shell 不展开通配符，程序内主动展开（glob）。

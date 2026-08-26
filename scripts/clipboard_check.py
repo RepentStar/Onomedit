@@ -31,7 +31,9 @@ def set_hdrop_clipboard(paths: list[str]) -> None:
     user32.EmptyClipboard.restype = ctypes.c_bool
     user32.CloseClipboard.restype = ctypes.c_bool
 
-    header = struct.pack("<IIiii", 20, 0, 0, 0, 1)  # pFiles=20, pt=(0,0), fNC=0, fWide=1
+    header = struct.pack(
+        "<IIiii", 20, 0, 0, 0, 1
+    )  # pFiles=20, pt=(0,0), fNC=0, fWide=1
     body = "".join(p + "\x00" for p in paths) + "\x00"
     raw = header + body.encode("utf-16-le")
     hmem = kernel32.GlobalAlloc(0x0042, len(raw))  # GMEM_MOVEABLE | GMEM_ZEROINIT
@@ -70,7 +72,10 @@ def main() -> int:
         set_hdrop_clipboard(["C:\\dir with space\\f1.txt", "D:\\中文目录\\文件.txt"])
         got = clipboard.get_paths()
         print("HDROP 读到:", got)
-        check("HDROP 多文件（含空格/中文）", got == ["C:\\dir with space\\f1.txt", "D:\\中文目录\\文件.txt"])
+        check(
+            "HDROP 多文件（含空格/中文）",
+            got == ["C:\\dir with space\\f1.txt", "D:\\中文目录\\文件.txt"],
+        )
 
         # 3) 纯文本路径（不带引号）
         root.clipboard_clear()

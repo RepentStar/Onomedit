@@ -47,9 +47,7 @@ class SettingsWindow(tk.Toplevel):
         scrollbar.pack(side="right", fill="y")
 
         body = ttk.Frame(self._canvas)
-        self._body_window = self._canvas.create_window(
-            (0, 0), window=body, anchor="nw"
-        )
+        self._body_window = self._canvas.create_window((0, 0), window=body, anchor="nw")
         body.bind("<Configure>", self._update_scroll_region)
         self._canvas.bind("<Configure>", self._resize_scroll_body)
 
@@ -185,8 +183,8 @@ class SettingsWindow(tk.Toplevel):
             delta = getattr(event, "delta", 0)
             if not delta:
                 return "break"
-            units = -max(1, abs(delta) // 120) if delta > 0 else max(
-                1, abs(delta) // 120
+            units = (
+                -max(1, abs(delta) // 120) if delta > 0 else max(1, abs(delta) // 120)
             )
         self._canvas.yview_scroll(units, "units")
         return "break"

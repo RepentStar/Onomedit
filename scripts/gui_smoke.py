@@ -46,8 +46,12 @@ def main() -> int:
     win._add_paths([tmp])
     shown = list(win.listbox.get(0, "end"))
     assert any(x.endswith("a.txt") for x in shown), f"应显示展开后的文件: {shown}"
-    assert any(x.endswith(os.sep + "sub") for x in shown), f"应显示层级 1 的子目录: {shown}"
-    assert not any(x.endswith("b.txt") for x in shown), f"层级 1 不应显示更深文件: {shown}"
+    assert any(x.endswith(os.sep + "sub") for x in shown), (
+        f"应显示层级 1 的子目录: {shown}"
+    )
+    assert not any(x.endswith("b.txt") for x in shown), (
+        f"层级 1 不应显示更深文件: {shown}"
+    )
 
     # 2) 取消展开 → 只显示目录本身
     win.subdirs_var.set(False)
@@ -56,14 +60,18 @@ def main() -> int:
     assert shown == [tmp], f"未勾选展开应只显示目录本身: {shown}"
 
     # 3) 确认窗口：默认配置（差异/距离关闭）→ 只有 2 列
-    lw = ListWindow(root, [("C:/x/a.txt", "C:/x/b.txt"), ("C:/x/c.txt", "C:/x/c.txt")], base="C:/x")
+    lw = ListWindow(
+        root, [("C:/x/a.txt", "C:/x/b.txt"), ("C:/x/c.txt", "C:/x/c.txt")], base="C:/x"
+    )
     assert lw.tree is not None
     assert len(lw.tree.selection()) == 2  # 默认全选
     assert lw._display("C:/x/a.txt") == "a.txt"  # 相对路径
-    assert len(lw.tree["columns"]) == 2, f"差异/距离关闭时应只有 2 列: {lw.tree['columns']}"
-    assert all(
-        lw.tree.column(c)["anchor"] == "center" for c in lw.tree["columns"]
-    ), "所有数据列应居中显示"
+    assert len(lw.tree["columns"]) == 2, (
+        f"差异/距离关闭时应只有 2 列: {lw.tree['columns']}"
+    )
+    assert all(lw.tree.column(c)["anchor"] == "center" for c in lw.tree["columns"]), (
+        "所有数据列应居中显示"
+    )
 
     # 3.5) 强制关闭（点 X）→ on_cancel 回调触发，供主窗口刷新状态栏
     cancelled = []
@@ -82,9 +90,9 @@ def main() -> int:
     cfg4.preview.distance = True
     lw4 = ListWindow(root, [("C:/x/a.txt", "C:/x/b.txt")], cfg=cfg4, base="C:/x")
     assert len(lw4.tree["columns"]) == 4, f"开启后应为 4 列: {lw4.tree['columns']}"
-    assert all(
-        lw4.tree.column(c)["anchor"] == "center" for c in lw4.tree["columns"]
-    ), "开启差异/距离后所有列也应居中显示"
+    assert all(lw4.tree.column(c)["anchor"] == "center" for c in lw4.tree["columns"]), (
+        "开启差异/距离后所有列也应居中显示"
+    )
 
     sw = SettingsWindow(root)
     sw.update_idletasks()
@@ -104,10 +112,7 @@ def main() -> int:
 
     root.after(600, root.destroy)
     root.mainloop()
-    print(
-        "GUI 冒烟通过 ✔"
-        "（窗口创建/设置滚动/默认全选/相对路径/列动态隐藏/目录展开）"
-    )
+    print("GUI 冒烟通过 ✔（窗口创建/设置滚动/默认全选/相对路径/列动态隐藏/目录展开）")
     return 0
 
 

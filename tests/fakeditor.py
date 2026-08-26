@@ -43,7 +43,8 @@ def main() -> int:
     elif mode == "set":
         lineno = int(args[0]) if args else 1
         content = args[1] if len(args) > 1 else "edited"
-        lines = open(path, encoding="utf-8").read().splitlines()
+        with open(path, encoding="utf-8") as source:
+            lines = source.read().splitlines()
         if 1 <= lineno <= len(lines):
             lines[lineno - 1] = content
         else:
@@ -60,7 +61,8 @@ def main() -> int:
     elif mode == "truncate":
         # 只保留前 N 行（模拟用户删行，用于行数校验失败测试）
         keep = int(args[0]) if args else 1
-        lines = open(path, encoding="utf-8").read().splitlines()
+        with open(path, encoding="utf-8") as source:
+            lines = source.read().splitlines()
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             if lines[:keep]:
                 f.write("\n".join(lines[:keep]) + "\n")

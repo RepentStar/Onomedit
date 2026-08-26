@@ -176,7 +176,7 @@ def _focus_editor_window(pid: int) -> None:
     found: list[int] = []
 
     @WNDENUMPROC
-    def _enum(hwnd, _lparam) -> bool:  # noqa: N803 - Win32 回调参数名
+    def _enum(hwnd, _lparam) -> bool:
         process_id = ctypes.c_uint()
         user32.GetWindowThreadProcessId(hwnd, ctypes.byref(process_id))
         if process_id.value == pid and user32.IsWindowVisible(hwnd):

@@ -1,7 +1,5 @@
 """日志：记录、轮转、读取、恢复方向解析。"""
 
-from pathlib import Path
-
 import pytest
 
 from onomedit.core.logger import RenameLogger, parse_line
@@ -55,7 +53,9 @@ def test_rotation(logger, monkeypatch):
         logger.record(f"old{i}.txt", f"new{i}.txt")
     assert logger.history_path.exists()
     # 轮转后至少产生 history.1.log
-    assert (logger.log_dir / "history.1.log").exists() or logger.history_path.stat().st_size <= 20
+    assert (
+        logger.log_dir / "history.1.log"
+    ).exists() or logger.history_path.stat().st_size <= 20
 
 
 def test_read_empty(logger):

@@ -38,14 +38,32 @@ def main() -> None:
     assert e.expand("<n>1;3;1;") == "002"  # 同实例跨调用延续
     e2 = EnvVars()
     assert e2.expand("<n>5;2;1;") == "05"  # 不同参数独立
-    assert format_date("yyyy-MM-dd", datetime.datetime(2026, 8, 12, 10, 30)) == "2026-08-12"
+    assert (
+        format_date("yyyy-MM-dd", datetime.datetime(2026, 8, 12, 10, 30))
+        == "2026-08-12"
+    )
     assert format_date("HH:mm:ss", datetime.datetime(2026, 1, 1, 9, 5, 3)) == "09:05:03"
 
     # 规则
-    assert apply_rule("cat", Rule(scope="stem", kind="replace", find="a", replace="b")) == "cbt"
-    assert apply_rule("cat", Rule(scope="stem", kind="replace_icase", find="A", replace="X")) == "cXt"
-    assert apply_rule("img12", Rule(scope="stem", kind="regex", find=r"(\d+)", replace=r"[\1]")) == "img[12]"
-    assert apply_rule("abc", Rule(scope="stem", kind="convert", convert="upper")) == "ABC"
+    assert (
+        apply_rule("cat", Rule(scope="stem", kind="replace", find="a", replace="b"))
+        == "cbt"
+    )
+    assert (
+        apply_rule(
+            "cat", Rule(scope="stem", kind="replace_icase", find="A", replace="X")
+        )
+        == "cXt"
+    )
+    assert (
+        apply_rule(
+            "img12", Rule(scope="stem", kind="regex", find=r"(\d+)", replace=r"[\1]")
+        )
+        == "img[12]"
+    )
+    assert (
+        apply_rule("abc", Rule(scope="stem", kind="convert", convert="upper")) == "ABC"
+    )
     cond = Rule(scope="stem", kind="replace", find="a", replace="b", condition=r"^c")
     assert apply_rule("cat", cond) == "cbt"
     assert apply_rule("bat", cond) == "bat"  # 条件不匹配跳过
@@ -79,7 +97,8 @@ def main() -> None:
         f.write("y")
     res = Renamer().run([(x, y), (y, x)])  # 交换
     assert len(res.success) == 2, res
-    assert open(y).read() == "x" and open(x).read() == "y"
+    with open(y) as y_file, open(x) as x_file:
+        assert y_file.read() == "x" and x_file.read() == "y"
 
     print("冒烟测试通过 ✔")
 

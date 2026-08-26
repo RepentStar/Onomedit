@@ -13,7 +13,17 @@ import random
 import uuid
 
 # 变量名 → 参数个数（n=3：起始/位数/步长；d/t/tc=1：格式；其余 0）
-VAR_ARITY = {"n": 3, "d": 1, "t": 1, "tc": 1, "f": 0, "p": 0, "r": 0, "rg": 0, "clip": 0}
+VAR_ARITY = {
+    "n": 3,
+    "d": 1,
+    "t": 1,
+    "tc": 1,
+    "f": 0,
+    "p": 0,
+    "r": 0,
+    "rg": 0,
+    "clip": 0,
+}
 
 DEFAULT_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss"
 
@@ -21,7 +31,7 @@ DEFAULT_DATE_FORMAT = "yyyy-MM-dd HH:mm:ss"
 class EnvContext:
     """展开上下文：当前文件路径、剪贴板文本。"""
 
-    __slots__ = ("file", "clip_text")
+    __slots__ = ("clip_text", "file")
 
     def __init__(self, file: str = "", clip_text: str | None = None):
         self.file = file
@@ -94,10 +104,8 @@ class EnvVars:
                 step = int(args[2].strip())
             except (ValueError, IndexError):
                 return None
-            if width < 1:
-                width = 1
-            if step < 1:
-                step = 1
+            width = max(width, 1)
+            step = max(step, 1)
             key = (start, width, step)
             cur = self._counters.get(key)
             cur = start if cur is None else cur + step

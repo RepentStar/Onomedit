@@ -1,6 +1,5 @@
 """路径封装：四段拆分（含点开头/多扩展名）、序列化对称、重命名。"""
 
-import os
 from pathlib import Path
 
 import pytest
@@ -30,7 +29,9 @@ def test_directory_with_dots_has_no_extension(tmp_path):
     assert item.name == "0ikj2.56234.345"
     assert item.stem == "0ikj2.56234.345"
     assert item.ext == ""
-    assert Path(item.with_field("stem", "renamed.folder")) == tmp_path / "renamed.folder"
+    assert (
+        Path(item.with_field("stem", "renamed.folder")) == tmp_path / "renamed.folder"
+    )
 
 
 def test_serialize_roundtrip_symmetric():

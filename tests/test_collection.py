@@ -12,6 +12,7 @@ from onomedit.core.pathitem import PathItem
 
 class _Stream:
     """模拟管道 stdout（delimiter 分隔）：含 Windows CRLF 与空行。"""
+
     def __init__(self, content):
         self._data = iter(content.split("\n"))
 

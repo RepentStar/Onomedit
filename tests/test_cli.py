@@ -7,7 +7,9 @@ from onomedit.core import config as config_mod
 
 
 def test_rename_exclude_parses_multi_tags():
-    args = build_parser().parse_args(["rename", "a.txt", "--exclude", "f", "h", "--dry-run"])
+    args = build_parser().parse_args(
+        ["rename", "a.txt", "--exclude", "f", "h", "--dry-run"]
+    )
     assert args.exclude == [["f", "h"]]
     assert args.dry_run is True
 
@@ -29,7 +31,9 @@ def test_rename_exclude_all_choices_are_valid():
     args = build_parser().parse_args(
         ["rename", "a.txt", "--exclude", *config_mod.EXCLUDE_TAGS]
     )
-    assert [tag for group in args.exclude for tag in group] == list(config_mod.EXCLUDE_TAGS)
+    assert [tag for group in args.exclude for tag in group] == list(
+        config_mod.EXCLUDE_TAGS
+    )
 
 
 def test_rename_without_exclude_keeps_none():
@@ -55,7 +59,9 @@ def test_rename_sort_by_absent_none():
 def test_rename_sort_by_all_choices_are_valid():
     from onomedit.core.collection import SORT_BY_CHOICES
 
-    args = build_parser().parse_args(["rename", "a.txt", "--sort-by", SORT_BY_CHOICES[-1]])
+    args = build_parser().parse_args(
+        ["rename", "a.txt", "--sort-by", SORT_BY_CHOICES[-1]]
+    )
     assert args.sort_by == SORT_BY_CHOICES[-1]
 
 
@@ -156,7 +162,9 @@ def test_rename_reverse_absent_false():
 
 
 def test_rename_reverse_with_sort_by():
-    args = build_parser().parse_args(["rename", "a.txt", "--sort-by", "name", "--reverse"])
+    args = build_parser().parse_args(
+        ["rename", "a.txt", "--sort-by", "name", "--reverse"]
+    )
     assert args.sort_by == "name"
     assert args.reverse is True
 
@@ -226,7 +234,9 @@ def test_cmd_rename_stdin_non_tty_reads_stream(monkeypatch, isolated_config):
 
     monkeypatch.setattr(cli_mod, "RenamePipeline", FakePipeline)
     monkeypatch.setattr(cli_mod.sys, "stdin", FakeStdin())
-    monkeypatch.setattr(collection, "read_stream_paths", lambda stream=None: ["pipe1.txt", "pipe2.txt"])
+    monkeypatch.setattr(
+        collection, "read_stream_paths", lambda stream=None: ["pipe1.txt", "pipe2.txt"]
+    )
     args = build_parser().parse_args(["rename"])
     cli_mod._cmd_rename(args)
     assert captured["paths"] == ["pipe1.txt", "pipe2.txt"]

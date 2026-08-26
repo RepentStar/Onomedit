@@ -32,7 +32,14 @@ def test_every_shell_mentions_all_subcommands():
 
 def test_bash_covers_rename_and_config():
     script = completion.completion_for("bash")
-    for flag in ("--dry-run", "--no-editor", "--multi-tab", "--reverse", "--path-type", "--sort-by"):
+    for flag in (
+        "--dry-run",
+        "--no-editor",
+        "--multi-tab",
+        "--reverse",
+        "--path-type",
+        "--sort-by",
+    ):
         assert flag in script
     for action in ("set", "set-editor", "reset"):
         assert action in script

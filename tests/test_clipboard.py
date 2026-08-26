@@ -26,11 +26,15 @@ def test_parse_mixed_quoted_and_plain():
 
 def test_parse_backslash_not_escaped():
     # 无引号路径的反斜杠不能被转义（shlex posix=True 的坑）
-    assert clipboard._parse_path_text("C:\\plain\\nofile.txt") == ["C:\\plain\\nofile.txt"]
+    assert clipboard._parse_path_text("C:\\plain\\nofile.txt") == [
+        "C:\\plain\\nofile.txt"
+    ]
 
 
 def test_parse_single_quoted_path():
-    assert clipboard._parse_path_text('"C:\\spaced dir\\f.txt"') == ["C:\\spaced dir\\f.txt"]
+    assert clipboard._parse_path_text('"C:\\spaced dir\\f.txt"') == [
+        "C:\\spaced dir\\f.txt"
+    ]
 
 
 def test_parse_blank_lines_ignored():
@@ -64,7 +68,9 @@ def _set_hdrop_clipboard(paths: list[str]) -> None:
     user32.EmptyClipboard.restype = ctypes.c_bool
     user32.CloseClipboard.restype = ctypes.c_bool
 
-    header = struct.pack("<IIiii", 20, 0, 0, 0, 1)  # pFiles=20, pt=(0,0), fNC=0, fWide=1
+    header = struct.pack(
+        "<IIiii", 20, 0, 0, 0, 1
+    )  # pFiles=20, pt=(0,0), fNC=0, fWide=1
     body = "".join(p + "\x00" for p in paths) + "\x00"
     raw = header + body.encode("utf-16-le")
     hmem = kernel32.GlobalAlloc(0x0042, len(raw))  # GMEM_MOVEABLE | GMEM_ZEROINIT
@@ -132,9 +138,13 @@ def test_get_paths_text_fallback(monkeypatch):
     """无 HDROP 时回退文本解析。"""
     if os.name == "nt":
         monkeypatch.setattr(clipboard, "_win_get_hdrop", lambda: None)
-        monkeypatch.setattr(clipboard, "_win_get_text", lambda: '"C:\\a b\\x.txt" "C:\\d\\y.txt"')
+        monkeypatch.setattr(
+            clipboard, "_win_get_text", lambda: '"C:\\a b\\x.txt" "C:\\d\\y.txt"'
+        )
     else:
-        monkeypatch.setattr(clipboard, "get_text", lambda: '"C:\\a b\\x.txt" "C:\\d\\y.txt"')
+        monkeypatch.setattr(
+            clipboard, "get_text", lambda: '"C:\\a b\\x.txt" "C:\\d\\y.txt"'
+        )
     assert clipboard.get_paths() == ["C:\\a b\\x.txt", "C:\\d\\y.txt"]
 
 

@@ -7,16 +7,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from onomedit.core import (
-    collection,
-    editor,
-    envvars,
-    rules,
-    tempfile_mgr,
-)
-from onomedit.core import (
-    config as config_mod,
-)
+from onomedit.core import collection, editor, envvars, rules, tempfile_mgr
+from onomedit.core import config as config_mod
 from onomedit.core.logger import RenameLogger, parse_line
 from onomedit.core.pathitem import PathItem, rename_ensure_parent
 from onomedit.i18n import tr
@@ -32,7 +24,6 @@ class DuplicateTargetError(PipelineError):
 
     def __init__(self, conflicts: list[tuple[str, list[str]]]):
         self.conflicts = conflicts
-        # 每组冲突：目标单独一行、每个源文件各占一行，避免长路径挤在同一行
         lines = [tr("检测到目标重名，已中止（未执行任何重命名）:")]
         for new, olds in conflicts:
             lines.append(tr("  目标: {target}", target=new))
@@ -61,7 +52,7 @@ def find_duplicate_targets(pairs: list[tuple[str, str]]) -> list[tuple[str, list
     返回 ``[(目标路径, [源路径, ...]), ...]``，按目标首次出现顺序，仅含重复组。
     """
     groups: dict[str, list[str]] = {}
-    first: dict[str, str] = {}  # 规范化键 → 首次出现的原始目标写法（用于显示）
+    first: dict[str, str] = {}
     for old, new in pairs:
         if old == new:
             continue
@@ -76,10 +67,8 @@ class RenameResult:
     """批量重命名结果：成功 / 失败 / 无变化（跳过）。"""
 
     success: list[tuple[str, str]] = field(default_factory=list)
-    failed: list[tuple[str, str, str]] = field(
-        default_factory=list
-    )  # (old, new, error)
-    skipped: list[str] = field(default_factory=list)  # 目标与源相同，无变化
+    failed: list[tuple[str, str, str]] = field(default_factory=list)
+    skipped: list[str] = field(default_factory=list)
 
     @property
     def total(self) -> int:
@@ -152,8 +141,6 @@ class Renamer:
         self._tmp_seq = 0
 
     def run(self, pairs: list[tuple[str, str]]) -> RenameResult:
-        # 目标重名预检：发现重名必须中止（不执行任何重命名），
-        # 避免"多个目标名相同，最终只改其中一个"。
         conflicts = find_duplicate_targets(pairs)
         if conflicts:
             raise DuplicateTargetError(conflicts)
@@ -162,7 +149,7 @@ class Renamer:
         self._pending = {old: new for old, new in pairs}
         for old, new in pairs:
             if old in self._removed:
-                continue  # 内容已被链处理移走，其落位在第二阶段
+                continue
             self._do(old, new)
 
         # 第二阶段：被移走的内容落位到最终目标
@@ -274,8 +261,6 @@ class RenamePipeline:
         if self.cfg.expand_subdirs:
             items = collection.expand_subdirs(items, self.cfg.subdirs_depth)
         items = collection.apply_excludes(items, self.cfg.exclude)
-        # 去重：多 glob 模式重叠、显式传同一路径、嵌套目录展开等均会产生重复项，
-        # 重复项会导致同一文件出现在临时文件多行，重命名时相互冲突。
         items = collection.dedupe_items(items)
         items = collection.sort_items(
             items, self.cfg.sort_by, reverse=self.cfg.sort_reverse
@@ -312,9 +297,7 @@ class RenamePipeline:
                 on_status=self.on_status,
             )
 
-        lines = tempfile_mgr.read_lines(
-            temp_path, len(items)
-        )  # 行数校验，不一致抛 LineCountError
+        lines = tempfile_mgr.read_lines(temp_path, len(items))
         new_fulls = [
             item.with_field(self.cfg.path_type, line)
             for item, line in zip(items, lines)

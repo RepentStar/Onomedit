@@ -3,15 +3,15 @@
 import os
 
 import pytest
+from conftest import fake_editor_cmd
 
 from onomedit.core import config as config_mod
-from onomedit.core.envvars import EnvContext, EnvVars
+from onomedit.core import tempfile_mgr
 from onomedit.core.logger import RenameLogger
 from onomedit.core.pathitem import PathItem
 from onomedit.core.pipeline import (
     DuplicateTargetError,
     PipelineError,
-    PipelineOutcome,
     RenamePipeline,
     Renamer,
     diff_text,
@@ -20,8 +20,6 @@ from onomedit.core.pipeline import (
     restore,
 )
 from onomedit.core.rules import Rule
-from onomedit.core import tempfile_mgr
-from conftest import fake_editor_cmd
 
 
 def _make_files(tmp_path, names=("a.txt", "b.txt", "c.txt")):
@@ -110,9 +108,11 @@ def test_envvar_counter_continues_across_files(tmp_path, isolated_config):
     cfg = _cfg(
         tmp_path,
         open_editor=False,
-        auto_rules=[Rule(scope="name", kind="regex", find=r"^.*$", replace="img_<n>1;3;1;.txt")],
+        auto_rules=[
+            Rule(scope="name", kind="regex", find=r"^.*$", replace="img_<n>1;3;1;.txt")
+        ],
     )
-    outcome = RenamePipeline(cfg).run_editor_mode(paths)
+    RenamePipeline(cfg).run_editor_mode(paths)
     assert (tmp_path / "img_001.txt").exists()
     assert (tmp_path / "img_002.txt").exists()
     assert (tmp_path / "img_003.txt").exists()
@@ -139,7 +139,11 @@ def test_line_count_mismatch_aborts(tmp_path, isolated_config):
 
 def test_dry_run_does_not_rename(tmp_path, isolated_config):
     paths = _make_files(tmp_path)
-    cfg = _cfg(tmp_path, open_editor=False, auto_rules=[Rule(scope="stem", kind="replace", find="a", replace="x")])
+    cfg = _cfg(
+        tmp_path,
+        open_editor=False,
+        auto_rules=[Rule(scope="stem", kind="replace", find="a", replace="x")],
+    )
     outcome = RenamePipeline(cfg).run_editor_mode(paths, dry_run=True)
     assert outcome.dry_run
     assert (tmp_path / "a.txt").exists()  # 未执行
@@ -163,7 +167,11 @@ def test_missing_editor_raises(tmp_path, isolated_config):
 
 def test_restore_last(tmp_path, isolated_config):
     paths = _make_files(tmp_path)
-    cfg = _cfg(tmp_path, open_editor=False, auto_rules=[Rule(scope="stem", kind="replace", find="a", replace="renamed")])
+    cfg = _cfg(
+        tmp_path,
+        open_editor=False,
+        auto_rules=[Rule(scope="stem", kind="replace", find="a", replace="renamed")],
+    )
     RenamePipeline(cfg).run_editor_mode(paths)
     assert (tmp_path / "renamed.txt").exists()
 
@@ -206,7 +214,10 @@ def test_duplicate_target_fails(tmp_path):
     assert f"    <- {a}" in msg
     assert f"    <- {b}" in msg
     # 状态栏用一句话摘要
-    assert excinfo.value.summary == "检测到目标重名，已中止（未执行任何重命名）: 1 组目标、涉及 2 个文件"
+    assert (
+        excinfo.value.summary
+        == "检测到目标重名，已中止（未执行任何重命名）: 1 组目标、涉及 2 个文件"
+    )
     # 中止：两个源文件都未动，目标文件未产生
     assert (tmp_path / "a.txt").exists()
     assert (tmp_path / "b.txt").exists()
@@ -246,20 +257,30 @@ def test_unchanged_item_not_duplicate_target(tmp_path):
 def test_find_duplicate_targets_groups():
     """find_duplicate_targets 分组：三源同一目标、两目标名不同、无变化项忽略。"""
     conflicts = find_duplicate_targets(
-        [("/d/a.txt", "/d/same.txt"), ("/d/b.txt", "/d/same.txt"), ("/d/c.txt", "/d/other.txt")]
+        [
+            ("/d/a.txt", "/d/same.txt"),
+            ("/d/b.txt", "/d/same.txt"),
+            ("/d/c.txt", "/d/other.txt"),
+        ]
     )
     assert len(conflicts) == 1
     new, olds = conflicts[0]
     assert new == "/d/same.txt"
     assert olds == ["/d/a.txt", "/d/b.txt"]
     # 无变化项不参与判定
-    assert find_duplicate_targets([("/d/a.txt", "/d/a.txt"), ("/d/b.txt", "/d/b.txt")]) == []
+    assert (
+        find_duplicate_targets([("/d/a.txt", "/d/a.txt"), ("/d/b.txt", "/d/b.txt")])
+        == []
+    )
 
 
 def test_duplicate_target_error_multiple_groups_format():
     """多组重名：警告按组分行展示，每组目标一行、每个源文件一行。"""
     err = DuplicateTargetError(
-        [("/d/same.txt", ["/d/a.txt", "/d/b.txt", "/d/c.txt"]), ("/d/other.txt", ["/d/d.txt", "/d/e.txt"])]
+        [
+            ("/d/same.txt", ["/d/a.txt", "/d/b.txt", "/d/c.txt"]),
+            ("/d/other.txt", ["/d/d.txt", "/d/e.txt"]),
+        ]
     )
     msg = str(err)
     lines = msg.splitlines()
@@ -268,7 +289,10 @@ def test_duplicate_target_error_multiple_groups_format():
     assert lines[2:5] == ["    <- /d/a.txt", "    <- /d/b.txt", "    <- /d/c.txt"]
     assert lines[5] == "  目标: /d/other.txt"
     assert lines[6:8] == ["    <- /d/d.txt", "    <- /d/e.txt"]
-    assert err.summary == "检测到目标重名，已中止（未执行任何重命名）: 2 组目标、涉及 5 个文件"
+    assert (
+        err.summary
+        == "检测到目标重名，已中止（未执行任何重命名）: 2 组目标、涉及 5 个文件"
+    )
 
 
 def test_duplicate_target_aborts_flow(tmp_path, isolated_config):
@@ -358,7 +382,11 @@ def test_rename_creates_missing_target_parent(tmp_path):
 
 def test_sanitize_applied_in_plan(tmp_path, isolated_config):
     paths = _make_files(tmp_path)
-    cfg = _cfg(tmp_path, open_editor=False, auto_rules=[Rule(scope="stem", kind="replace", find="a", replace="con")])
+    cfg = _cfg(
+        tmp_path,
+        open_editor=False,
+        auto_rules=[Rule(scope="stem", kind="replace", find="a", replace="con")],
+    )
     outcome = RenamePipeline(cfg).run_editor_mode(paths)
     assert len(outcome.result.success) == 1
     # con.txt 是保留名 → 安全命名加前缀 _con.txt
@@ -376,7 +404,10 @@ def test_sort_by_mtime_orders_prepared_items(tmp_path, isolated_config):
     os.utime(b, (past + 10, past + 10))
     cfg = _cfg(tmp_path, open_editor=False, sort_by="mtime")
     items, _, _ = RenamePipeline(cfg).prepare([str(b), str(a)])
-    assert [i.name for i in items] == ["a.txt", "b.txt"]  # 输入顺序 b,a → 按修改时间 a,b
+    assert [i.name for i in items] == [
+        "a.txt",
+        "b.txt",
+    ]  # 输入顺序 b,a → 按修改时间 a,b
 
 
 def test_sort_by_default_keeps_input_order(tmp_path, isolated_config):

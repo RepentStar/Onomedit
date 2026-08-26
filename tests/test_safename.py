@@ -1,7 +1,5 @@
 """安全命名：非法字符替换、保留名、结尾点/空格、重名序号。"""
 
-from pathlib import Path
-
 from onomedit.utils.safename import sanitize_name, unique_path
 
 

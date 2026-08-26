@@ -48,12 +48,20 @@ def test_convert_dispatch():
     assert apply_rule("ABC", Rule(kind=KIND_CONVERT, convert="lower")) == "abc"
     assert apply_rule("abc", Rule(kind=KIND_CONVERT, convert="capitalize")) == "Abc"
     assert apply_rule("abc", Rule(kind=KIND_CONVERT, convert="title")) == "Abc"
-    assert apply_rule("abc", Rule(kind=KIND_CONVERT, convert="unknown")) == "abc"  # 未知转换跳过
+    assert (
+        apply_rule("abc", Rule(kind=KIND_CONVERT, convert="unknown")) == "abc"
+    )  # 未知转换跳过
 
 
 def test_insert_start_and_end():
-    assert apply_rule("abc", Rule(kind=KIND_INSERT, insert=">", insert_at=INSERT_START)) == ">abc"
-    assert apply_rule("abc", Rule(kind=KIND_INSERT, insert="<", insert_at=INSERT_END)) == "abc<"
+    assert (
+        apply_rule("abc", Rule(kind=KIND_INSERT, insert=">", insert_at=INSERT_START))
+        == ">abc"
+    )
+    assert (
+        apply_rule("abc", Rule(kind=KIND_INSERT, insert="<", insert_at=INSERT_END))
+        == "abc<"
+    )
 
 
 def test_env_kind_passthrough():
@@ -73,7 +81,14 @@ def test_disabled_rule_noop():
 
 
 def test_rule_serialization_roundtrip():
-    r = Rule(scope="ext", kind=KIND_REGEX, find=r"\.(jpg|jpeg)", replace=".png", condition="x", enabled=False)
+    r = Rule(
+        scope="ext",
+        kind=KIND_REGEX,
+        find=r"\.(jpg|jpeg)",
+        replace=".png",
+        condition="x",
+        enabled=False,
+    )
     restored = rule_from_dict(rule_to_dict(r))
     assert restored == r
     assert restored.scope == "ext"

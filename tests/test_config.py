@@ -1,11 +1,9 @@
 """配置读写 / 默认值合并 / 损坏回退 / 按 KEY 设置。"""
 
-import json
-
 import pytest
 
 from onomedit.core import config as config_mod
-from onomedit.core.rules import Rule, rule_to_dict
+from onomedit.core.rules import Rule
 
 
 def test_default_values():
@@ -55,7 +53,9 @@ def test_from_dict_fills_defaults_for_missing():
 
 
 def test_from_dict_ignores_unknown_keys():
-    cfg = config_mod.from_dict({"editor": "x", "unknown_key": 1, "exclude": {"no_such": True}})
+    cfg = config_mod.from_dict(
+        {"editor": "x", "unknown_key": 1, "exclude": {"no_such": True}}
+    )
     assert cfg.editor == "x"
     assert cfg.exclude.hidden is True  # 未知子键忽略
 
@@ -78,13 +78,15 @@ def test_load_corrupt_falls_back(isolated_config):
 
 
 def test_load_missing_writes_default(isolated_config):
-    cfg = config_mod.load_config()
+    config_mod.load_config()
     assert config_mod.config_path().exists()
 
 
 def test_set_value_type_inference(isolated_config):
     cfg = config_mod.default_config()
-    assert config_mod.set_value(cfg, "exclude.hidden", "false") == "exclude.hidden = false"
+    assert (
+        config_mod.set_value(cfg, "exclude.hidden", "false") == "exclude.hidden = false"
+    )
     assert cfg.exclude.hidden is False
     config_mod.set_value(cfg, "subdirs_depth", "3")
     assert cfg.subdirs_depth == 3
@@ -147,7 +149,9 @@ def test_load_config_fills_default_editor_on_first_run(isolated_config, monkeypa
     assert again.editor == "notepad"
 
 
-def test_load_config_fills_empty_editor_in_existing_config(isolated_config, monkeypatch):
+def test_load_config_fills_empty_editor_in_existing_config(
+    isolated_config, monkeypatch
+):
     """旧配置 editor 为空：加载时补写探测结果。"""
     path = config_mod.config_path()
     path.parent.mkdir(parents=True, exist_ok=True)

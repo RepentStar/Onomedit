@@ -15,7 +15,14 @@ KIND_CONVERT = "convert"
 KIND_INSERT = "insert"
 KIND_ENV = "env"  # 仅标记：字段在环境变量阶段统一展开
 
-RULE_KINDS = (KIND_REPLACE, KIND_REPLACE_ICASE, KIND_REGEX, KIND_CONVERT, KIND_INSERT, KIND_ENV)
+RULE_KINDS = (
+    KIND_REPLACE,
+    KIND_REPLACE_ICASE,
+    KIND_REGEX,
+    KIND_CONVERT,
+    KIND_INSERT,
+    KIND_ENV,
+)
 
 INSERT_START = "start"
 INSERT_END = "end"
@@ -27,7 +34,9 @@ class Rule:
     kind: str = KIND_REPLACE
     find: str = ""  # replace / regex 的查找串
     replace: str = ""  # 替换为（可含环境变量占位符，最后统一展开）
-    convert: str = ""  # convert 种类：upper/lower/capitalize/title/fullwidth/halfwidth/urldecode
+    convert: str = (
+        ""  # convert 种类：upper/lower/capitalize/title/fullwidth/halfwidth/urldecode
+    )
     insert: str = ""  # insert 文本
     insert_at: str = INSERT_START  # start | end
     condition: str = ""  # 可选正则；字段值不匹配时规则跳过
@@ -59,7 +68,9 @@ def apply_rule(value: str, rule: Rule) -> str:
     if rule.kind == KIND_REPLACE_ICASE:
         if not rule.find:
             return value
-        return re.sub(re.escape(rule.find), lambda _: rule.replace, value, flags=re.IGNORECASE)
+        return re.sub(
+            re.escape(rule.find), lambda _: rule.replace, value, flags=re.IGNORECASE
+        )
     if rule.kind == KIND_REGEX:
         if not rule.find:
             return value
@@ -75,7 +86,9 @@ def apply_rule(value: str, rule: Rule) -> str:
     if rule.kind == KIND_INSERT:
         if not rule.insert:
             return value
-        return value + rule.insert if rule.insert_at == INSERT_END else rule.insert + value
+        return (
+            value + rule.insert if rule.insert_at == INSERT_END else rule.insert + value
+        )
     if rule.kind == KIND_ENV:
         # 环境变量展开由主流程统一执行（保持顺序固定：最后展开）
         return value

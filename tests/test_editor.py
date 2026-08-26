@@ -1,13 +1,12 @@
 """编辑器等待策略：单实例/启动器型/多标签/超时/命令解析。"""
 
 import os
-import sys
 import threading
 
 import pytest
+from conftest import fake_editor_cmd
 
 from onomedit.core import editor, tempfile_mgr
-from conftest import fake_editor_cmd
 
 
 def _write(tmp_path, name="names.txt", content="line1\n"):
@@ -152,5 +151,7 @@ def test_status_callback_receives_messages(tmp_path):
     sig = tempfile_mgr.signature(p)
     messages = []
     cmd = fake_editor_cmd("launcher")
-    editor.launch_and_wait(cmd, p, sig, multi_tab=True, timeout=0.5, on_status=messages.append)
+    editor.launch_and_wait(
+        cmd, p, sig, multi_tab=True, timeout=0.5, on_status=messages.append
+    )
     assert messages  # 多标签模式启动时有状态提示
