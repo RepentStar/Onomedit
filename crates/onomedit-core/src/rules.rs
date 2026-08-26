@@ -187,8 +187,7 @@ fn adapt_named_conditionals(pattern: &str) -> String {
 }
 
 fn adapt_python_pattern(pattern: &str) -> String {
-    // Python's global `(?a)` flag makes shorthand classes and word boundaries ASCII-only.
-    // fancy-regex rejects disabling Unicode, so remove `a` and expand those shorthands.
+    // fancy-regex 无法关闭 Unicode，因此需展开 Python `(?a)` 的简写类和单词边界。
     let Some((flags, remainder)) = global_flags(pattern) else {
         return adapt_fragment(pattern, false, false, false, false).0;
     };
@@ -762,8 +761,7 @@ fn replace_with_captures(value: &str, regex: &Regex, parts: &[Part]) -> Option<S
     let mut output = String::with_capacity(value.len());
     let mut previous_end = 0;
     let mut search_start = 0;
-    // Python allows an empty match immediately after a non-empty match. fancy-regex's capture
-    // iterator skips it, so drive captures_from_pos directly and advance only after empty matches.
+    // 手动推进以保留 Python 在非空匹配后紧随空匹配的语义。
     while search_start <= value.len() {
         let Some(captures) = regex.captures_from_pos(value, search_start).ok()? else {
             break;

@@ -536,13 +536,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let source = dir.path().join("0ikj2.56234.345");
         fs::create_dir(&source).unwrap();
-        let mut config = Config::default();
-        config.auto_rules = vec![Rule {
-            scope: PathType::Stem,
-            find: "0ikj2".into(),
-            replace: "folder".into(),
-            ..Rule::default()
-        }];
+        let config = Config {
+            auto_rules: vec![Rule {
+                scope: PathType::Stem,
+                find: "0ikj2".into(),
+                replace: "folder".into(),
+                ..Rule::default()
+            }],
+            ..Config::default()
+        };
         let pipeline = RenamePipeline::new(config);
         let pairs = pipeline.plan(
             &[PathItem::new(&source)],

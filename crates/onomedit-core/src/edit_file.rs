@@ -23,8 +23,7 @@ pub enum EditFileError {
 }
 
 pub struct EditFile {
-    // TempPath 保留离开会话时的自动清理，但不像 NamedTempFile 那样持续持有
-    // Windows 文件句柄。现代 Notepad/VS Code 可据此用原子替换完成 Ctrl+S。
+    // TempPath 自动清理，但不阻止编辑器原子替换文件。
     path: TempPath,
 }
 
@@ -97,8 +96,7 @@ mod tests {
         let session = EditFile::create(&[PathItem::new(item_path)], PathType::Stem, None).unwrap();
         let edit_path = session.path().to_owned();
 
-        // 现代编辑器常先写旁路文件，再删除/替换原文件。Windows 上若仍持有
-        // NamedTempFile 句柄，remove_file 会报共享冲突并触发编辑器“另存为”。
+        // 模拟编辑器通过旁路文件原子保存。
         let replacement = edit_path.with_extension("replacement");
         fs::write(&replacement, "renamed\n").unwrap();
         fs::remove_file(&edit_path).unwrap();

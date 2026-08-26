@@ -15,6 +15,7 @@ target/
 # 编辑器
 .vscode/
 .idea/
+.worktrees/
 
 # docs
 docs/
