@@ -178,6 +178,13 @@ def test_detect_win_editor_notepad_first(monkeypatch):
     assert config_mod._detect_win_editor() == "notepad"
 
 
+def test_detect_default_editor_editor_env_first(monkeypatch):
+    """$EDITOR 的优先级高于任一平台的内置探测。"""
+    monkeypatch.setenv("EDITOR", "myeditor --wait")
+    monkeypatch.setattr(config_mod, "_detect_win_editor", lambda: "notepad")
+    assert config_mod.detect_default_editor() == "myeditor --wait"
+
+
 def test_detect_win_editor_code_fallback(monkeypatch):
     """Windows：无 notepad 时回退 code -w。"""
     monkeypatch.setattr(config_mod.shutil, "which", _fake_which({"code"}))
@@ -199,10 +206,9 @@ def test_detect_linux_editor_nano_first(monkeypatch):
     assert config_mod._detect_linux_editor() == "kate"
 
 
-def test_detect_linux_editor_editor_env_fallback(monkeypatch):
+def test_detect_linux_editor_none(monkeypatch):
     monkeypatch.setattr(config_mod.shutil, "which", _fake_which(set()))
-    monkeypatch.setenv("EDITOR", "myeditor")
-    assert config_mod._detect_linux_editor() == "myeditor"
+    assert config_mod._detect_linux_editor() == ""
 
 
 def test_migrate_noop_on_current():

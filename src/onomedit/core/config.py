@@ -136,7 +136,10 @@ def default_config() -> Config:
 
 
 def detect_default_editor() -> str:
-    """按系统探测可用的默认编辑器命令（首次启动自动配置，避免 editor 为空报错）。"""
+    """探测默认编辑器命令，优先使用 ``$EDITOR``。"""
+    editor_from_env = os.environ.get("EDITOR", "").strip()
+    if editor_from_env:
+        return editor_from_env
     if os.name == "nt":
         return _detect_win_editor()
     if sys.platform == "darwin":
@@ -167,7 +170,7 @@ def _detect_linux_editor() -> str:
     for name in ("nano", "vi", "kate"):
         if shutil.which(name):
             return name
-    return os.environ.get("EDITOR", "")
+    return ""
 
 
 def _ensure_default_editor(cfg: Config) -> None:
