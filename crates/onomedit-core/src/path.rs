@@ -53,11 +53,21 @@ pub enum PathError {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PathItem {
     full: PathBuf,
+    is_dir: bool,
 }
 
 impl PathItem {
     pub fn new(path: impl Into<PathBuf>) -> Self {
-        Self { full: path.into() }
+        let full = path.into();
+        let is_dir = full.is_dir();
+        Self { full, is_dir }
+    }
+
+    pub fn with_directory_hint(path: impl Into<PathBuf>, is_dir: bool) -> Self {
+        Self {
+            full: path.into(),
+            is_dir,
+        }
     }
 
     pub fn full(&self) -> &Path {
@@ -76,6 +86,9 @@ impl PathItem {
     }
 
     pub fn stem(&self) -> String {
+        if self.is_dir {
+            return self.name();
+        }
         self.full
             .file_stem()
             .map(|v| v.to_string_lossy().into_owned())
@@ -83,6 +96,9 @@ impl PathItem {
     }
 
     pub fn ext(&self) -> String {
+        if self.is_dir {
+            return String::new();
+        }
         self.full
             .extension()
             .map(|v| format!(".{}", v.to_string_lossy()))
@@ -147,6 +163,20 @@ mod tests {
         assert_eq!(
             item.with_field(PathType::Ext, ".md"),
             PathBuf::from("/d/report.tar.md")
+        );
+    }
+
+    #[test]
+    fn dotted_directory_has_no_extension() {
+        let directory = tempfile::tempdir().unwrap();
+        let dotted = directory.path().join("0ikj2.56234.345");
+        std::fs::create_dir(&dotted).unwrap();
+        let item = PathItem::new(&dotted);
+        assert_eq!(item.stem(), "0ikj2.56234.345");
+        assert_eq!(item.ext(), "");
+        assert_eq!(
+            item.with_field(PathType::Stem, "renamed.folder"),
+            directory.path().join("renamed.folder")
         );
     }
 }

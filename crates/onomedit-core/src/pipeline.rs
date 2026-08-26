@@ -188,13 +188,14 @@ impl RenamePipeline {
                 if self.config.apply_rules {
                     if self.config.enable_auto_rules {
                         for rule in &self.config.auto_rules {
-                            let current = PathItem::new(&full);
+                            let current =
+                                PathItem::with_directory_hint(&full, item.full().is_dir());
                             let value = rules::apply(&current.field(rule.scope), rule);
                             full = current.with_field(rule.scope, &value);
                         }
                     }
                     if self.config.enable_envvars {
-                        let current = PathItem::new(&full);
+                        let current = PathItem::with_directory_hint(&full, item.full().is_dir());
                         let context = EnvContext {
                             file: item.full().to_string_lossy().into_owned(),
                             clip_text: self.clipboard_text.clone(),
@@ -204,7 +205,7 @@ impl RenamePipeline {
                     }
                 }
                 if self.config.safety.sanitize {
-                    let current = PathItem::new(&full);
+                    let current = PathItem::with_directory_hint(&full, item.full().is_dir());
                     full = current
                         .directory()
                         .join(sanitize_name(&current.name(), "_"));
@@ -467,6 +468,8 @@ pub fn restore(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::path::PathType;
+    use crate::rules::Rule;
 
     fn pair(old: &Path, new: &Path) -> RenamePair {
         RenamePair::new(old, new)
@@ -526,5 +529,25 @@ mod tests {
         fs::write(&source, "x").unwrap();
         Renamer::new(None).run(&[pair(&source, &target)]).unwrap();
         assert!(target.exists());
+    }
+
+    #[test]
+    fn stem_rule_preserves_dotted_directory_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("0ikj2.56234.345");
+        fs::create_dir(&source).unwrap();
+        let mut config = Config::default();
+        config.auto_rules = vec![Rule {
+            scope: PathType::Stem,
+            find: "0ikj2".into(),
+            replace: "folder".into(),
+            ..Rule::default()
+        }];
+        let pipeline = RenamePipeline::new(config);
+        let pairs = pipeline.plan(
+            &[PathItem::new(&source)],
+            &[dir.path().join("0ikj2.56234.345")],
+        );
+        assert_eq!(pairs[0].requested_new, dir.path().join("folder.56234.345"));
     }
 }
