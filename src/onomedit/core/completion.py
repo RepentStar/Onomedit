@@ -84,7 +84,7 @@ _FLAG_TIPS: dict[str, str] = {
 _VALUE_TIPS: dict[str, dict[str, str]] = {
     "--path-type": {
         "full": "完整路径",
-        "name": "仅文件名",
+        "name": "完整文件名",
         "stem": "不含扩展名",
         "ext": "仅扩展名",
     },
