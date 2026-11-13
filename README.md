@@ -182,6 +182,25 @@ onomedit rename "*.jpg" "*.png"         # 同时匹配两类，推荐写法
 
 请不要写 `*[jpg,png]`，它是“匹配一个字符”的字符类，不表示扩展名集合。`*.{jpg,png}` 只可能由部分 Unix shell 预先展开，程序本身不支持；请并列写多个模式。模式重叠、重复路径或父子目录重叠时，Onomedit 会在处理前去重。
 
+### 递归匹配通配符
+
+添加 `-r` 或 `--recursive`，即可在模式所在目录及所有子目录中搜索匹配项。例如，递归修改测试目录下的所有 `report*.docx` 文件名：
+
+```powershell
+onomedit rename "./test_files/report*.docx" -r
+```
+
+默认 `stem` 模式保留扩展名，每个文件仍在原目录中改名。通配符请加引号，避免被 shell 提前展开。
+
+递归匹配不受 `--depth` 或配置 `subdirs_depth` 限制，也支持显式的 `**` 模式：
+
+```powershell
+onomedit rename "*.docx" --recursive
+onomedit rename "C:\test_files\**\report*.docx" -r --dry-run
+```
+
+该参数只影响通配符匹配；显式文件路径保持不变，目录路径仍按下面的展开层级设置处理。
+
 ### 目录和展开层级
 
 默认会展开目录，配置深度为 10：
@@ -240,7 +259,7 @@ Get-ChildItem -File -Name *.jpg | onomedit rename
 onomedit rename [--dry-run] [--no-editor]
                 [--path-type {full,name,stem,ext}] [--multi-tab]
                 【--timeout 秒】 【--sort-by 键】 [--reverse]
-                [--depth N] [--exclude 类型 【类型 ...】]
+                [-r | --recursive] [--depth N] [--exclude 类型 【类型 ...】]
                 [paths ...]
 ```
 
@@ -333,6 +352,10 @@ onomedit rename a.jpg b.jpg c.jpg --reverse
 ```
 
 它只能临时开启反转，不能临时关闭配置中已开启的 `sort_reverse`。关闭时执行 `onomedit config set sort_reverse false`。
+
+### `-r` / `--recursive`
+
+递归匹配 glob 模式，搜索模式所在目录及任意层级的子目录，沿用现有的排除、去重和排序规则。不加此参数时，`*` 仍只匹配单层目录。详见[递归匹配通配符](#递归匹配通配符)。
 
 ### `--depth N`
 

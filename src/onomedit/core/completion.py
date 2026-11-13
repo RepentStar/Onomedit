@@ -30,7 +30,7 @@ _VALUE_CHOICES: dict[str, list[str]] = {
 
 # 子命令 -> 布尔选项（无取值）。config 的子操作在 {config} 里单独处理。
 _BOOL_FLAGS: dict[str, list[str]] = {
-    "rename": ["--dry-run", "--no-editor", "--multi-tab", "--reverse"],
+    "rename": ["--dry-run", "--no-editor", "--multi-tab", "--reverse", "-r", "--recursive"],
     "restore": ["--all", "--partial"],
     "history": ["--all"],
 }
@@ -73,6 +73,8 @@ _FLAG_TIPS: dict[str, str] = {
     "--no-editor": "跳过编辑器直接重命名",
     "--multi-tab": "多标签编辑器适配",
     "--reverse": "反转排序顺序",
+    "-r": "递归匹配通配符",
+    "--recursive": "递归匹配通配符",
     "--timeout": "编辑器等待超时（秒）",
     "--depth": "目录搜索深度（层级）",
     "--sort-by": "重命名顺序",
@@ -319,6 +321,7 @@ def _zsh_rename_args() -> str:
         "                '--no-editor[跳过编辑器]'",
         "                '--multi-tab[多标签编辑器]'",
         "                '--reverse[反转顺序]'",
+        "                '(-r --recursive)'{-r,--recursive}'[递归匹配通配符]'",
         "                '--timeout=[编辑器等待超时]:秒'",
         "                '--depth=[目录搜索深度]:层级'",
         "                '--path-type=[路径类型]:类型:(full name stem ext)'",
@@ -371,7 +374,7 @@ def _pwsh_main_body(words: str) -> str:
     switch ($cmd) {{
         '' {{ $candidates = $cmds }}
         'rename' {{
-            $candidates = '--dry-run','--no-editor','--multi-tab','--reverse',
+            $candidates = '--dry-run','--no-editor','--multi-tab','--reverse','-r','--recursive',
                 '--timeout','--depth','--sort-by','--exclude','--path-type'
         }}
         'restore' {{ $candidates = '--all','--partial' }}
@@ -402,7 +405,7 @@ def _gen_fish() -> str:
     lines.extend(
         _fish_sub(
             "rename",
-            ["--dry-run", "--no-editor", "--multi-tab", "--reverse"],
+            ["--dry-run", "--no-editor", "--multi-tab", "--reverse", "--recursive"],
             {
                 "--path-type": "full name stem ext",
                 "--sort-by": "default name path mtime ctime size",
@@ -411,6 +414,9 @@ def _gen_fish() -> str:
                 "--depth": "",
             },
         )
+    )
+    lines.append(
+        "complete -c onomedit -f -n '__fish_seen_subcommand_from rename' -s r -d '递归匹配通配符'"
     )
     lines.extend(_fish_sub("restore", ["--all", "--partial"], {}))
     lines.extend(_fish_sub("history", ["--all"], {}))

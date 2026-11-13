@@ -70,8 +70,37 @@ def test_full_flow_no_editor_applies_rules(tmp_path, isolated_config):
     assert (tmp_path / "alpha.txt").exists()
 
 
+def test_recursive_rename_preserves_parents_and_extensions(tmp_path, isolated_config):
+    sub = tmp_path / "subdir"
+    sub.mkdir()
+    reports = [tmp_path / "report1.docx", sub / "report1.docx"]
+    unrelated = sub / "other.docx"
+    for path in reports + [unrelated]:
+        path.write_text("content", encoding="utf-8")
+    cfg = _cfg(
+        tmp_path,
+        open_editor=False,
+        auto_rules=[Rule(scope="stem", kind="replace", find="report", replace="renamed")],
+    )
+    pipeline = RenamePipeline(cfg, recursive=True)
+    # 多模式、显式路径重叠时，每个文件只处理一次。
+    patterns = [str(tmp_path / "report*.docx"), str(sub / "*.docx"), str(reports[1])]
+    outcome = pipeline.run_editor_mode(patterns)
+    assert set(outcome.result.success) == {
+        (str(path), str(path.with_name("renamed1.docx"))) for path in reports
+    }
+    assert outcome.result.skipped == [str(unrelated)]
+    assert not outcome.result.failed
+    assert all(not path.exists() for path in reports)
+    assert all(
+        path.with_name("renamed1.docx").read_text(encoding="utf-8") == "content"
+        for path in reports
+    )
+    assert unrelated.read_text(encoding="utf-8") == "content"
+
+
 def test_stem_mode_keeps_dotted_directory_name(tmp_path, isolated_config):
-    folder = tmp_path / "0ikj2.56234.345"
+    folder = tmp_path / "sample.part1.part2"
     folder.mkdir()
     cfg = _cfg(tmp_path, open_editor=False, expand_subdirs=False)
     items, new_fulls, _ = RenamePipeline(cfg).prepare([str(folder)])
@@ -80,17 +109,17 @@ def test_stem_mode_keeps_dotted_directory_name(tmp_path, isolated_config):
 
 
 def test_stem_rule_preserves_dotted_directory_name(tmp_path, isolated_config):
-    folder = tmp_path / "0ikj2.56234.345"
+    folder = tmp_path / "sample.part1.part2"
     folder.mkdir()
     cfg = _cfg(
         tmp_path,
         open_editor=False,
         expand_subdirs=False,
-        auto_rules=[Rule(scope="stem", kind="replace", find="0ikj2", replace="folder")],
+        auto_rules=[Rule(scope="stem", kind="replace", find="sample", replace="folder")],
     )
     outcome = RenamePipeline(cfg).run_editor_mode([str(folder)])
-    assert outcome.result.success == [(str(folder), str(tmp_path / "folder.56234.345"))]
-    assert (tmp_path / "folder.56234.345").is_dir()
+    assert outcome.result.success == [(str(folder), str(tmp_path / "folder.part1.part2"))]
+    assert (tmp_path / "folder.part1.part2").is_dir()
 
 
 def test_editor_exit_without_change_noop(tmp_path, isolated_config):

@@ -55,6 +55,45 @@ def test_collect_glob(tmp_path):
     assert sorted(os.path.basename(p) for p in got) == ["g1.txt", "g2.txt"]
 
 
+@pytest.mark.parametrize("pattern", ["report*.docx", "**/report*.docx"])
+def test_collect_recursive_glob(tmp_path, pattern):
+    root = tmp_path / "test_files"
+    deep = root.joinpath(*[f"level{i}" for i in range(12)])
+    deep.mkdir(parents=True)
+    expected = [root / "report1.docx", deep / "report2.docx"]
+    for path in expected + [deep / "other.docx", deep / "report3.txt"]:
+        path.write_text("x", encoding="utf-8")
+
+    got = collection.collect_paths([str(root / pattern)], recursive=True)
+    assert set(map(os.path.normpath, got)) == set(map(str, expected))
+    assert len(got) == len(expected)
+
+
+def test_collect_glob_without_recursive_stays_shallow(tmp_path):
+    _make_tree(tmp_path)
+    assert collection.collect_paths([str(tmp_path / "*.txt")]) == [
+        str(tmp_path / "a.txt")
+    ]
+
+
+@pytest.mark.parametrize("pattern", ["*.txt", "sub/*.txt", "s?b/[bc].txt"])
+def test_collect_recursive_relative_glob(tmp_path, monkeypatch, pattern):
+    _make_tree(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    got = collection.collect_paths([pattern], recursive=True)
+    expected = {"b.txt", "c.txt"}
+    if pattern == "*.txt":
+        expected.add("a.txt")
+    assert {os.path.basename(p) for p in got} == expected
+
+
+def test_collect_recursive_preserves_explicit_paths(tmp_path):
+    _make_tree(tmp_path)
+    paths = [str(tmp_path / "a.txt"), str(tmp_path / "sub")]
+    assert collection.collect_paths(paths, recursive=True) == paths
+    assert collection.collect_paths([str(tmp_path / "missing*.docx")], recursive=True) == []
+
+
 def test_collect_clipboard(monkeypatch, tmp_path):
     p = tmp_path / "clip.txt"
     p.write_text("x", encoding="utf-8")

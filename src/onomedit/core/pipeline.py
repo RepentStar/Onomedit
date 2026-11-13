@@ -239,11 +239,13 @@ class RenamePipeline:
         temp_dir=None,
         on_status=None,
         clipboard_text: str | None = None,
+        recursive: bool = False,
     ):
         self.cfg = cfg or config_mod.load_config()
         self.temp_dir = temp_dir or (self.cfg.temp_dir or None)
         self.on_status = on_status or (lambda msg: None)
         self.clipboard_text = clipboard_text
+        self.recursive = recursive
 
     def prepare(
         self, raw_paths: list[str] | None = None
@@ -253,7 +255,9 @@ class RenamePipeline:
         返回 (items, new_full 列表, 临时文件路径)。行数校验失败抛 LineCountError。
         """
         paths = collection.collect_paths(
-            raw_paths, use_clipboard=self.clipboard_text is None
+            raw_paths,
+            use_clipboard=self.clipboard_text is None,
+            recursive=self.recursive,
         )
         if not paths:
             raise PipelineError(tr("没有可处理的文件（路径不存在或剪贴板为空）"))

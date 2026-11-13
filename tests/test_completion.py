@@ -30,6 +30,17 @@ def test_every_shell_mentions_all_subcommands():
             assert sub in script, f"{name} 补全缺子命令 {sub}"
 
 
+@pytest.mark.parametrize("shell", completion.supported_shells())
+def test_every_shell_completes_recursive(shell):
+    script = completion.completion_for(shell)
+    if shell == "fish":
+        assert "-l recursive" in script
+        assert "-s r " in script
+    else:
+        assert "--recursive" in script
+        assert "-r" in script
+
+
 def test_bash_covers_rename_and_config():
     script = completion.completion_for("bash")
     for flag in (

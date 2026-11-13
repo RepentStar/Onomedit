@@ -121,12 +121,14 @@ def build_parser() -> argparse.ArgumentParser:
             "示例:\n"
             "  onomedit rename a.txt b.txt\n"
             "  onomedit rename *.jpg --dry-run\n"
+            '  onomedit rename "照片/*.jpg" -r --dry-run  递归匹配子目录\n'
             "  onomedit rename --no-editor --path-type name  仅应用规则不拉起编辑器\n"
             "  onomedit rename *.txt --exclude h d --dry-run  临时排除隐藏文件与目录\n"
             "  dir /b *.jpg | onomedit rename  从管道读入路径（编辑模式下重命名）",
             "Examples:\n"
             "  onomedit rename a.txt b.txt\n"
             "  onomedit rename *.jpg --dry-run\n"
+            '  onomedit rename "photos/*.jpg" -r --dry-run  Search subfolders recursively\n'
             "  onomedit rename --no-editor --path-type name  Apply rules without an editor\n"
             "  onomedit rename *.txt --exclude h d --dry-run  Exclude hidden files and folders\n"
             "  dir /b *.jpg | onomedit rename  Read paths from stdin",
@@ -168,6 +170,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=choose(
             "临时反转重命名顺序：与 --sort-by 组合时按排序键降序，否则反转原顺序",
             "Reverse the input order, or sort descending when used with --sort-by",
+        ),
+    )
+    p_rename.add_argument(
+        "-r",
+        "--recursive",
+        action="store_true",
+        help=choose(
+            "递归匹配通配符：搜索模式所在目录及所有子目录（不受 --depth 限制）",
+            "Match globs in their folder and all subfolders (independent of --depth)",
         ),
     )
     p_rename.add_argument(
@@ -380,7 +391,11 @@ def _cmd_rename(args) -> int:
         tags = [tag for group in args.exclude for tag in group]
         cfg.exclude = config_mod.merge_exclude_tags(cfg.exclude, tags)
 
-    pipeline = RenamePipeline(cfg, on_status=lambda msg: print(msg, flush=True))
+    pipeline = RenamePipeline(
+        cfg,
+        on_status=lambda msg: print(msg, flush=True),
+        recursive=args.recursive,
+    )
 
     # 未提供路径且 stdin 来自管道时，把管道输出当作路径列表（优先于剪贴板）
     raw_paths = args.paths

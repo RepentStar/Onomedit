@@ -102,6 +102,47 @@ def test_rename_depth_parses():
     assert args.depth == 3
 
 
+@pytest.mark.parametrize("flag", ["-r", "--recursive"])
+def test_cmd_rename_recursive_matches_only_reports(
+    tmp_path, isolated_config, capsys, flag
+):
+    import onomedit.cli as cli_mod
+
+    root = tmp_path / "test_files"
+    sub = root / "subdir" / "nested"
+    sub.mkdir(parents=True)
+    reports = [root / "report1.docx", sub / "report2.docx"]
+    other = sub / "other.docx"
+    for path in reports + [other]:
+        path.write_text("original", encoding="utf-8")
+    cfg = config_mod.default_config()
+    cfg.editor = "nvim"
+    cfg.temp_dir = str(tmp_path / "edit")
+    (tmp_path / "edit").mkdir()
+    config_mod.save_config(cfg)
+    config_before = config_mod.config_path().read_bytes()
+
+    # --depth 0 关闭目录展开，仍需递归匹配文件名模式。
+    args = build_parser().parse_args(
+        [
+            "rename", str(root / "report*.docx"), flag,
+            "--no-editor", "--dry-run", "--depth", "0",
+        ]
+    )
+    assert cli_mod._cmd_rename(args) == 0
+    output = capsys.readouterr().out
+    for report in reports:
+        assert str(report) in output
+    assert str(other) not in output
+    assert all(path.read_text(encoding="utf-8") == "original" for path in reports + [other])
+    assert config_mod.config_path().read_bytes() == config_before
+
+
+def test_rename_recursive_absent_false():
+    args = build_parser().parse_args(["rename", "*.docx"])
+    assert args.recursive is False
+
+
 def test_rename_depth_zero_allowed():
     """0 = 不展开（与配置 subdirs_depth 语义一致）。"""
     args = build_parser().parse_args(["rename", "folder", "--depth", "0"])

@@ -38,11 +38,13 @@ def read_stream_paths(stream=None) -> list[str]:
 
 
 def collect_paths(
-    raw_paths: list[str] | None, *, use_clipboard: bool = True
+    raw_paths: list[str] | None, *, use_clipboard: bool = True, recursive: bool = False
 ) -> list[str]:
     """收集文件路径：参数优先，否则读剪贴板；过滤不存在的路径。
 
     Windows 上 shell 不展开通配符，程序内主动展开（glob）。
+    recursive=True 时，在模式的文件名部分前插入 **，匹配任意层级的子目录；
+    已含 ** 路径段的模式直接使用，显式文件/目录路径保持不变。
     """
     paths: list[str] = []
     if raw_paths:
@@ -53,7 +55,12 @@ def collect_paths(
     expanded: list[str] = []
     for p in paths:
         if glob.has_magic(p):
-            expanded.extend(glob.glob(p))
+            if recursive:
+                parent, name = os.path.split(p)
+                parts = os.path.normpath(p).split(os.sep)
+                if "**" not in parts:
+                    p = os.path.join(parent, "**", name)
+            expanded.extend(glob.glob(p, recursive=recursive))
         else:
             expanded.append(p)
     return [p for p in expanded if os.path.exists(p)]
