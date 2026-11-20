@@ -6,9 +6,17 @@ import difflib
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import cast
 
-from onomedit.core import collection, editor, envvars, rules, tempfile_mgr
+from onomedit.core import collection, editor, envvars, pathitem, rules, tempfile_mgr
 from onomedit.core import config as config_mod
+from onomedit.core.absolute_path import (
+    AbsoluteItem,
+    row_error,
+    validate_name_segment,
+    validate_target,
+)
+from onomedit.core.absolute_rename import AbsoluteRenamer, build_absolute_moves
 from onomedit.core.logger import RenameLogger, parse_line
 from onomedit.core.pathitem import PathItem, rename_ensure_parent
 from onomedit.i18n import tr
@@ -95,7 +103,7 @@ class PipelineOutcome:
     pairs: list[tuple[str, str]] = field(default_factory=list)
     preview: list[PreviewRow] | None = None
     dry_run: bool = False
-    temp_path: str = ""
+    temp_path: str | Path = ""
 
 
 def levenshtein(a: str, b: str) -> int:
@@ -240,20 +248,25 @@ class RenamePipeline:
         on_status=None,
         clipboard_text: str | None = None,
         recursive: bool = False,
+        absolute: bool = False,
     ):
         self.cfg = cfg or config_mod.load_config()
         self.temp_dir = temp_dir or (self.cfg.temp_dir or None)
         self.on_status = on_status or (lambda msg: None)
         self.clipboard_text = clipboard_text
         self.recursive = recursive
+        self.absolute = absolute
 
     def prepare(
         self, raw_paths: list[str] | None = None
-    ) -> tuple[list[PathItem], list[str], str]:
+    ) -> tuple[list[PathItem], list[str], str | Path]:
         """流程前半：收集 → 展开 → 过滤 → 写临时文件 → 等待编辑 → 读回。
 
         返回 (items, new_full 列表, 临时文件路径)。行数校验失败抛 LineCountError。
         """
+        if self.absolute and self.cfg.path_type != pathitem.PATH_TYPE_FULL:
+            raise PipelineError(tr("--absolute 仅适用于 full 路径类型"))
+        cwd = os.getcwd() if self.absolute else ""
         paths = collection.collect_paths(
             raw_paths,
             use_clipboard=self.clipboard_text is None,
@@ -264,19 +277,40 @@ class RenamePipeline:
         items = collection.build_items(paths)
         if self.cfg.expand_subdirs:
             items = collection.expand_subdirs(items, self.cfg.subdirs_depth)
-        items = collection.apply_excludes(items, self.cfg.exclude)
-        items = collection.dedupe_items(items)
+        items = collection.apply_excludes(
+            items, self.cfg.exclude, absolute=self.absolute
+        )
+        if self.absolute:
+            try:
+                items = collection.absolute_items(items, cwd)
+            except ValueError as exc:
+                raise PipelineError(str(exc)) from exc
+        else:
+            items = collection.dedupe_items(items)
         items = collection.sort_items(
             items, self.cfg.sort_by, reverse=self.cfg.sort_reverse
         )
         if not items:
             raise PipelineError(tr("应用排除规则后没有可处理的文件"))
+        if self.absolute and not self.cfg.open_editor:
+            return items, [item.full for item in items], ""
 
         temp_path, _ = tempfile_mgr.write_items(
             items, self.cfg.path_type, temp_dir=self.temp_dir
         )
-        sig = tempfile_mgr.signature(temp_path)
+        try:
+            lines = self._edit_items(temp_path, len(items))
+        except BaseException:
+            self._cleanup_temp(temp_path)
+            raise
+        new_fulls = [
+            item.with_field(self.cfg.path_type, line)
+            for item, line in zip(items, lines)
+        ]
+        return items, new_fulls, temp_path
 
+    def _edit_items(self, temp_path: Path, count: int) -> list[str]:
+        sig = tempfile_mgr.signature(temp_path)
         if self.cfg.open_editor:
             editor_cmd = self.cfg.editor
             if not editor_cmd.strip():
@@ -301,12 +335,10 @@ class RenamePipeline:
                 on_status=self.on_status,
             )
 
-        lines = tempfile_mgr.read_lines(temp_path, len(items))
-        new_fulls = [
-            item.with_field(self.cfg.path_type, line)
-            for item, line in zip(items, lines)
-        ]
-        return items, new_fulls, temp_path
+        try:
+            return tempfile_mgr.read_lines(temp_path, count, absolute=self.absolute)
+        except UnicodeDecodeError as exc:
+            raise PipelineError(tr("编辑文件必须使用 UTF-8 编码")) from exc
 
     def plan(
         self, items: list[PathItem], new_fulls: list[str]
@@ -317,26 +349,44 @@ class RenamePipeline:
         """
         pairs: list[tuple[str, str]] = []
         env = envvars.EnvVars()
-        for item, new_full in zip(items, new_fulls):
+        for line, (item, new_full) in enumerate(zip(items, new_fulls), 1):
             full = new_full
-            if self.cfg.apply_rules:
-                if self.cfg.enable_auto_rules:
-                    for rule in self.cfg.auto_rules:
+            try:
+                if self.absolute:
+                    validate_target(full)
+                if self.cfg.apply_rules:
+                    if self.cfg.enable_auto_rules:
+                        for rule in self.cfg.auto_rules:
+                            pi = PathItem(full, is_dir=item.is_dir)
+                            value = rules.apply_rule(pi.get_field(rule.scope), rule)
+                            if self.absolute and rule.scope != pathitem.PATH_TYPE_FULL:
+                                validate_name_segment(value)
+                            full = pi.with_field(
+                                rule.scope, value, native=self.absolute
+                            )
+                            if self.absolute:
+                                validate_target(full)
+                    if self.cfg.enable_envvars:
                         pi = PathItem(full, is_dir=item.is_dir)
-                        value = pi.get_field(rule.scope)
-                        value = rules.apply_rule(value, rule)
-                        full = pi.with_field(rule.scope, value)
-                if self.cfg.enable_envvars:
-                    # 环境变量作用于 name 段（目录段保持原样）
+                        ctx = envvars.EnvContext(
+                            file=item.full, clip_text=self.clipboard_text
+                        )
+                        new_name = env.expand(pi.name, context=ctx)
+                        if self.absolute:
+                            validate_name_segment(new_name)
+                            if new_name in ("", ".", ".."):
+                                raise ValueError(tr("请填写完整的绝对路径和名称"))
+                        join = pathitem.join_name if self.absolute else os.path.join
+                        full = join(pi.directory, new_name)
+                if self.cfg.safety.sanitize:
                     pi = PathItem(full, is_dir=item.is_dir)
-                    ctx = envvars.EnvContext(
-                        file=item.full, clip_text=self.clipboard_text
-                    )
-                    new_name = env.expand(pi.name, context=ctx)
-                    full = os.path.join(pi.directory, new_name)
-            if self.cfg.safety.sanitize:
-                pi = PathItem(full, is_dir=item.is_dir)
-                full = os.path.join(pi.directory, safename.sanitize_name(pi.name))
+                    full = os.path.join(pi.directory, safename.sanitize_name(pi.name))
+                if self.absolute:
+                    full = validate_target(full, final_name=True)
+            except ValueError as exc:
+                if not self.absolute:
+                    raise
+                raise PipelineError(row_error(line, item.full, full, exc)) from exc
             pairs.append((item.full, full))
         return pairs
 
@@ -347,11 +397,25 @@ class RenamePipeline:
         dry_run: bool = False,
     ) -> PipelineOutcome:
         """编辑器模式全流程（流程 1）。dry_run 仅预览（差异/距离）不执行。"""
-        items, new_fulls, temp_path = self.prepare(raw_paths)
+        try:
+            items, new_fulls, temp_path = self.prepare(raw_paths)
+        except OSError as exc:
+            if not self.absolute:
+                raise
+            raise PipelineError(str(exc)) from exc
         try:
             pairs = self.plan(items, new_fulls)
+            if self.absolute:
+                log_dir = config_mod.log_dir()
+                try:
+                    moves = build_absolute_moves(
+                        cast(list[AbsoluteItem], items), pairs, log_dir
+                    )
+                except ValueError as exc:
+                    raise PipelineError(str(exc)) from exc
         finally:
-            self._cleanup_temp(temp_path)
+            if temp_path:
+                self._cleanup_temp(temp_path)
 
         if dry_run:
             rows = (
@@ -363,14 +427,23 @@ class RenamePipeline:
                 pairs=pairs, preview=rows, dry_run=True, temp_path=temp_path
             )
 
-        log = RenameLogger(config_mod.log_dir())
-        log.begin_session()
-        renamer = Renamer(log=log)
-        result = renamer.run(pairs)
+        if self.absolute:
+            log = RenameLogger(log_dir)
+            try:
+                if any(not move.skipped for move in moves):
+                    pathitem.require_rename_no_replace()
+                log.begin_session()
+            except OSError as exc:
+                raise PipelineError(str(exc)) from exc
+            result = AbsoluteRenamer(log, RenameResult()).run(moves)
+        else:
+            log = RenameLogger(config_mod.log_dir())
+            log.begin_session()
+            result = Renamer(log=log).run(pairs)
         return PipelineOutcome(result=result, pairs=pairs, temp_path=temp_path)
 
     @staticmethod
-    def _cleanup_temp(temp_path: str) -> None:
+    def _cleanup_temp(temp_path: str | Path) -> None:
         try:
             os.unlink(temp_path)
         except OSError:

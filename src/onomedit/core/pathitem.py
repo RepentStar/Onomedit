@@ -5,7 +5,10 @@
 
 from __future__ import annotations
 
+import errno
 import os
+import sys
+from functools import lru_cache
 
 from onomedit.i18n import tr
 
@@ -52,7 +55,7 @@ class PathItem:
             raise ValueError(tr("未知路径类型: {scope}", scope=scope))
         return getattr(self, scope)
 
-    def with_field(self, scope: str, value: str) -> str:
+    def with_field(self, scope: str, value: str, *, native: bool = False) -> str:
         """把编辑后的某段写回全路径（序列化/反序列化对称的关键）。
 
         拼接时保持原路径的分隔符风格（正/反斜杠），不做无谓转换。
@@ -60,12 +63,13 @@ class PathItem:
         if scope == "full":
             return value
         parent = self.directory
+        join = join_name if native else self._join
         if scope == "name":
-            return self._join(parent, value)
+            return join(parent, value)
         if scope == "stem":
-            return self._join(parent, value + self.ext)
+            return join(parent, value + self.ext)
         if scope == "ext":
-            return self._join(parent, self.stem + value)
+            return join(parent, self.stem + value)
         raise ValueError(tr("未知路径类型: {scope}", scope=scope))
 
     @staticmethod
@@ -93,6 +97,14 @@ class PathItem:
         return hash(self.full)
 
 
+def join_name(parent: str, name: str) -> str:
+    """Append a literal name without interpreting a leading Windows drive prefix."""
+    separators = (os.sep, os.altsep) if os.altsep else (os.sep,)
+    return (
+        parent + (os.sep if parent and not parent.endswith(separators) else "") + name
+    )
+
+
 def rename_ensure_parent(old: str, new: str) -> None:
     """执行重命名；目标父目录缺失时先递归创建再重试一次。
 
@@ -112,3 +124,63 @@ def rename_ensure_parent(old: str, new: str) -> None:
             raise
         os.makedirs(parent, exist_ok=True)
         os.rename(old, new)
+
+
+@lru_cache(maxsize=1)
+def _native_rename():
+    try:
+        import ctypes
+
+        libc = ctypes.CDLL(None, use_errno=True)
+    except (ImportError, OSError) as exc:
+        raise OSError(errno.ENOTSUP, tr("当前平台不支持无覆盖重命名")) from exc
+    if sys.platform == "linux" and hasattr(libc, "renameat2"):
+        rename = libc.renameat2
+        rename.argtypes = (
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_int,
+            ctypes.c_char_p,
+            ctypes.c_uint,
+        )
+        rename.restype = ctypes.c_int
+
+        def move(old: bytes, new: bytes) -> int:
+            at_fdcwd = -100
+            rename_noreplace = 1
+            if rename(at_fdcwd, old, at_fdcwd, new, rename_noreplace) != 0:
+                return ctypes.get_errno() or errno.EIO
+            return 0
+
+        return move
+    if sys.platform == "darwin" and hasattr(libc, "renamex_np"):
+        rename = libc.renamex_np
+        rename.argtypes = (ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint)
+        rename.restype = ctypes.c_int
+
+        def move(old: bytes, new: bytes) -> int:
+            rename_excl = 0x00000004
+            if rename(old, new, rename_excl) != 0:
+                return ctypes.get_errno() or errno.EIO
+            return 0
+
+        return move
+    raise OSError(errno.ENOTSUP, tr("当前平台不支持无覆盖重命名"))
+
+
+def require_rename_no_replace() -> None:
+    if os.name != "nt":
+        _native_rename()
+
+
+def rename_no_replace(old: str, new: str) -> None:
+    """Move one directory entry atomically, failing if the target already exists."""
+    if os.name == "nt":
+        os.rename(old, new)
+        return
+    code = _native_rename()(os.fsencode(old), os.fsencode(new))
+    if code:
+        reason = os.strerror(code)
+        if code in (errno.ENOSYS, errno.ENOTSUP, errno.EOPNOTSUPP, errno.EINVAL):
+            reason = tr("文件系统不支持无覆盖重命名: {error}", error=reason)
+        raise OSError(code, reason, old, None, new)

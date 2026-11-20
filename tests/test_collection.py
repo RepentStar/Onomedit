@@ -151,13 +151,15 @@ def test_dedupe_items_removes_exact_duplicates(tmp_path):
     assert [i.full for i in got] == [str(p), str(other)]
 
 
-def test_dedupe_items_case_insensitive(tmp_path):
-    """Windows 大小写不敏感：不同写法的同一路径视为重复（首个保留）。"""
-    p = tmp_path / "A.TXT"
-    p.write_text("x", encoding="utf-8")
-    items = [PathItem(str(p)), PathItem(str(tmp_path / "a.txt"))]
+def test_dedupe_items_uses_platform_case_rules(tmp_path):
+    """Windows 的路径键折叠大小写，POSIX 的路径键保留原拼写。"""
+    upper = tmp_path / "A.TXT"
+    lower = tmp_path / "a.txt"
+    upper.write_text("x", encoding="utf-8")
+    items = [PathItem(str(upper)), PathItem(str(lower))]
     got = collection.dedupe_items(items)
-    assert [i.full for i in got] == [str(p)]
+    expected = [str(upper)] if os.name == "nt" else [str(upper), str(lower)]
+    assert [i.full for i in got] == expected
 
 
 def test_dedupe_items_relative_alias(tmp_path):

@@ -1,8 +1,10 @@
 # CLI 端到端验证：隔离配置 → 设置假编辑器 → rename → history → restore
 $ErrorActionPreference = "Stop"
-$root = "D:\git\Onomedit"
-$tmp = Join-Path $env:TEMP ("onomedit_e2e_" + [guid]::NewGuid().ToString("N"))
+$root = Split-Path -Parent $PSScriptRoot
+$tempRoot = (Resolve-Path -LiteralPath $env:TEMP).Path
+$tmp = Join-Path $tempRoot ("onomedit_e2e_" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Path $tmp | Out-Null
+$previousAppData = $env:APPDATA
 $env:APPDATA = (Join-Path $tmp "appdata")  # 隔离配置，避免污染真实 %APPDATA%
 Write-Host "== 临时目录: $tmp"
 
@@ -13,7 +15,8 @@ Set-Content -Path (Join-Path $tmp "c.txt") -Value "3" -Encoding utf8
 Push-Location $root
 try {
     # 1. 配置假编辑器：把临时文件第 1 行（a.txt 的 stem "a"）改为 renamed
-    uv run onomedit config set-editor "python D:\git\Onomedit\tests\fakeditor.py set 1 renamed"
+    $fakeEditor = Join-Path $root 'tests/fakeditor.py'
+    uv run onomedit config set-editor "python `"$fakeEditor`" set 1 renamed"
     if ($LASTEXITCODE -ne 0) { throw "set-editor 失败" }
 
     # 2. rename：拉起假编辑器 → 保存 → 重命名
@@ -45,10 +48,45 @@ try {
     Write-Host "== config =="
     uv run onomedit config | Select-Object -First 5
 
+    # 7. 绝对路径预览、跨目录移动和切换工作目录后恢复
+    $source = Join-Path $tmp 'a.txt'
+    $targetDir = Join-Path $tmp '归档/旅行'
+    $target = Join-Path $targetDir '原 图.txt'
+    $lastLog = Join-Path $env:APPDATA 'Onomedit/log/last.log'
+    $previousLog = Get-Content -LiteralPath $lastLog -Raw
+    uv run onomedit config set-editor "python `"$fakeEditor`" set 1 `"$target`""
+    if ($LASTEXITCODE -ne 0) { throw '设置绝对路径编辑器失败' }
+    $preview = uv run onomedit rename --path-type full --absolute --dry-run $source
+    if ($LASTEXITCODE -ne 0) { throw '绝对路径预览失败' }
+    if (-not (($preview -join "`n").Contains("$source  →  $target"))) { throw '预览缺少绝对路径' }
+    if ((Test-Path -LiteralPath $targetDir) -or (Get-Content -LiteralPath $lastLog -Raw) -ne $previousLog) {
+        throw '预览改动了目标目录或日志'
+    }
+    uv run onomedit rename --path-type full --absolute $source
+    if ($LASTEXITCODE -ne 0) { throw '绝对路径移动失败' }
+    if ((Test-Path -LiteralPath $source) -or (Get-Content -LiteralPath $target) -ne '1') {
+        throw '移动后的源路径或目标内容有误'
+    }
+    Push-Location $targetDir
+    try {
+        uv run --project $root onomedit restore
+        if ($LASTEXITCODE -ne 0) { throw '切换目录后恢复失败' }
+    }
+    finally {
+        Pop-Location
+    }
+    if ((Test-Path -LiteralPath $target) -or (Get-Content -LiteralPath $source) -ne '1') {
+        throw '恢复后的目标路径或源内容有误'
+    }
+
     Write-Host ""
     Write-Host "E2E CLI 全部通过 ✔"
 }
 finally {
     Pop-Location
-    Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
+    $env:APPDATA = $previousAppData
+    $resolvedTmp = (Resolve-Path -LiteralPath $tmp).Path
+    if ((Split-Path -Parent $resolvedTmp) -eq $tempRoot -and $resolvedTmp -eq $tmp) {
+        Remove-Item -LiteralPath $resolvedTmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }

@@ -39,10 +39,20 @@ def write_items(
     return Path(path), lines
 
 
-def read_lines(path: str | os.PathLike, expected_count: int) -> list[str]:
+def read_lines(
+    path: str | os.PathLike, expected_count: int, *, absolute: bool = False
+) -> list[str]:
     """读回临时文件并校验行数；不一致抛 LineCountError。"""
-    with open(path, "r", encoding="utf-8") as f:
-        lines = f.read().splitlines()
+    with open(path, "r", encoding="utf-8", newline="" if absolute else None) as f:
+        data = f.read()
+    if absolute:
+        # Only LF and CRLF delimit records. Preserve other line separators for validation.
+        records = data.split("\n")
+        lines = [line.removesuffix("\r") for line in records[:-1]]
+        if records[-1]:
+            lines.append(records[-1])
+    else:
+        lines = data.splitlines()
     if len(lines) != expected_count:
         raise LineCountError(
             tr(

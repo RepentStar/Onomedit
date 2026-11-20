@@ -121,6 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
             "示例:\n"
             "  onomedit rename a.txt b.txt\n"
             "  onomedit rename *.jpg --dry-run\n"
+            "  onomedit rename --path-type full --absolute --dry-run *.jpg\n"
             '  onomedit rename "照片/*.jpg" -r --dry-run  递归匹配子目录\n'
             "  onomedit rename --no-editor --path-type name  仅应用规则不拉起编辑器\n"
             "  onomedit rename *.txt --exclude h d --dry-run  临时排除隐藏文件与目录\n"
@@ -128,6 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Examples:\n"
             "  onomedit rename a.txt b.txt\n"
             "  onomedit rename *.jpg --dry-run\n"
+            "  onomedit rename --path-type full --absolute --dry-run *.jpg\n"
             '  onomedit rename "photos/*.jpg" -r --dry-run  Search subfolders recursively\n'
             "  onomedit rename --no-editor --path-type name  Apply rules without an editor\n"
             "  onomedit rename *.txt --exclude h d --dry-run  Exclude hidden files and folders\n"
@@ -149,6 +151,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_rename.add_argument(
         "--path-type", choices=config_mod.PATH_TYPES, help=tr("覆盖路径类型")
+    )
+    p_rename.add_argument(
+        "--absolute", action="store_true", help=tr("本次使用绝对路径编辑（仅适用于 full）")
     )
     p_rename.add_argument(
         "--multi-tab", action="store_true", help=tr("多标签编辑器：直接轮询等保存")
@@ -372,6 +377,9 @@ def _cmd_rename(args) -> int:
     cfg = config_mod.load_config()
     if args.path_type:
         cfg.path_type = args.path_type
+    if args.absolute and cfg.path_type != config_mod.PATH_TYPE_FULL:
+        print(tr("错误: {error}", error=tr("--absolute 仅适用于 full 路径类型")), file=sys.stderr)
+        return 2
     if args.multi_tab:
         cfg.multi_tab = True
     if args.timeout is not None:
@@ -395,6 +403,7 @@ def _cmd_rename(args) -> int:
         cfg,
         on_status=lambda msg: print(msg, flush=True),
         recursive=args.recursive,
+        absolute=args.absolute,
     )
 
     # 未提供路径且 stdin 来自管道时，把管道输出当作路径列表（优先于剪贴板）

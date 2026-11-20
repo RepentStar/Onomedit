@@ -257,7 +257,7 @@ Get-ChildItem -File -Name *.jpg | onomedit rename
 
 ```text
 onomedit rename [--dry-run] [--no-editor]
-                [--path-type {full,name,stem,ext}] [--multi-tab]
+                [--path-type {full,name,stem,ext}] [--absolute] [--multi-tab]
                 【--timeout 秒】 【--sort-by 键】 [--reverse]
                 [-r | --recursive] [--depth N] [--exclude 类型 【类型 ...】]
                 [paths ...]
@@ -302,6 +302,18 @@ onomedit rename "*.txt" --no-editor --dry-run
 ```powershell
 onomedit rename "*.jpeg" --path-type ext
 ```
+
+### `--absolute`
+
+本次运行使用 `full` 路径类型时，可以用 `--absolute` 把选中的文件和目录以绝对路径写入编辑器。配置已设为 `full` 时可省略 `--path-type full`。每行按原顺序填写一个包含名称的完整目标路径。
+
+```powershell
+onomedit rename --path-type full --absolute --dry-run '.\照片\*.jpg'
+```
+
+例如把 `C:\素材\照片\原图.jpg` 改为 `C:\素材\归档\旅行\原图.jpg`。Windows 也支持 `\\server\share\归档\原图.jpg`，POSIX 使用 `/` 开头的路径。空行、相对路径、根目录、尾随分隔符和 `..` 路径段会让整批中止。`--no-editor` 直接对绝对源路径按顺序应用规则。
+
+预览显示请求的目标。实际执行在同一卷内移动，按需创建目标父目录，并用 `原图 (1).jpg` 一类的序号避开外部占用。批内重复目标和目录依赖会在执行前报错。实际移动需要文件系统支持无覆盖重命名。成功日志记录实际落位的绝对路径，可在任意工作目录运行 `onomedit restore` 恢复。
 
 ### `--multi-tab`
 

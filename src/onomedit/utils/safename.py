@@ -49,12 +49,13 @@ def unique_path(target: Path) -> Path:
     """
     if not target.exists():
         return target
-    parent = target.parent
-    stem = target.stem
-    suffix = target.suffix
     n = 1
     while True:
-        candidate = parent / f"{stem} ({n}){suffix}"
+        candidate = numbered_path(target, n)
         if not candidate.exists():
             return candidate
         n += 1
+
+
+def numbered_path(target: Path, number: int) -> Path:
+    return target.parent / f"{target.stem} ({number}){target.suffix}"

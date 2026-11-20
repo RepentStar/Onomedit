@@ -30,7 +30,7 @@ _VALUE_CHOICES: dict[str, list[str]] = {
 
 # 子命令 -> 布尔选项（无取值）。config 的子操作在 {config} 里单独处理。
 _BOOL_FLAGS: dict[str, list[str]] = {
-    "rename": ["--dry-run", "--no-editor", "--multi-tab", "--reverse", "-r", "--recursive"],
+    "rename": ["--dry-run", "--no-editor", "--absolute", "--multi-tab", "--reverse", "-r", "--recursive"],
     "restore": ["--all", "--partial"],
     "history": ["--all"],
 }
@@ -71,6 +71,7 @@ _SUB_TIPS: dict[str, str] = {
 _FLAG_TIPS: dict[str, str] = {
     "--dry-run": "预览不执行",
     "--no-editor": "跳过编辑器直接重命名",
+    "--absolute": "本次使用绝对路径编辑（仅适用于 full）",
     "--multi-tab": "多标签编辑器适配",
     "--reverse": "反转排序顺序",
     "-r": "递归匹配通配符",
@@ -319,6 +320,7 @@ def _zsh_rename_args() -> str:
     lines = [
         "                '--dry-run[预览不执行]'",
         "                '--no-editor[跳过编辑器]'",
+        f"                '--absolute[{tr(_FLAG_TIPS['--absolute'])}]'",
         "                '--multi-tab[多标签编辑器]'",
         "                '--reverse[反转顺序]'",
         "                '(-r --recursive)'{-r,--recursive}'[递归匹配通配符]'",
@@ -329,7 +331,7 @@ def _zsh_rename_args() -> str:
         "                '--exclude=[排除类型]:类型:(f file d dir l link r readonly h hidden s system)'",
         "                '*:文件:_files'",
     ]
-    return "\n".join(lines)
+    return " \\\n".join(lines)
 
 
 def _gen_pwsh() -> str:
@@ -374,7 +376,7 @@ def _pwsh_main_body(words: str) -> str:
     switch ($cmd) {{
         '' {{ $candidates = $cmds }}
         'rename' {{
-            $candidates = '--dry-run','--no-editor','--multi-tab','--reverse','-r','--recursive',
+            $candidates = {','.join(repr(flag) for flag in _BOOL_FLAGS['rename'])},
                 '--timeout','--depth','--sort-by','--exclude','--path-type'
         }}
         'restore' {{ $candidates = '--all','--partial' }}
@@ -405,7 +407,7 @@ def _gen_fish() -> str:
     lines.extend(
         _fish_sub(
             "rename",
-            ["--dry-run", "--no-editor", "--multi-tab", "--reverse", "--recursive"],
+            [flag for flag in _BOOL_FLAGS["rename"] if flag.startswith("--")],
             {
                 "--path-type": "full name stem ext",
                 "--sort-by": "default name path mtime ctime size",

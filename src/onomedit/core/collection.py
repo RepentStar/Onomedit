@@ -6,6 +6,12 @@ import glob
 import os
 import sys
 
+from onomedit.core.absolute_path import (
+    AbsoluteItem,
+    SourceEntry,
+    row_error,
+    source_path,
+)
 from onomedit.core.pathitem import PathItem
 from onomedit.utils import clipboard as clipboard_util
 from onomedit.utils import fileattr
@@ -88,6 +94,19 @@ def dedupe_items(items: list[PathItem]) -> list[PathItem]:
     return out
 
 
+def absolute_items(items: list[PathItem], cwd: str) -> list[AbsoluteItem]:
+    """Prepare and deduplicate by resolved parent and final directory entry."""
+    selected: dict[str, AbsoluteItem] = {}
+    for line, item in enumerate(items, 1):
+        try:
+            source = SourceEntry.read(source_path(item.full, cwd))
+        except (OSError, ValueError) as exc:
+            raise ValueError(row_error(line, item.full, "", exc)) from exc
+        if source.key not in selected:
+            selected[source.key] = AbsoluteItem(source, is_dir=item.is_dir)
+    return list(selected.values())
+
+
 def expand_subdirs(items: list[PathItem], depth: int) -> list[PathItem]:
     """把目录项展开为其（限层级）子内容：depth=1 为直接子项，depth=2 再含下一层；
     depth<=0 不展开；展开后的目录项本身不再保留。"""
@@ -163,7 +182,9 @@ def _stat_attr(path: str, attr: str):
         return 0.0
 
 
-def apply_excludes(items: list[PathItem], exclude) -> list[PathItem]:
+def apply_excludes(
+    items: list[PathItem], exclude, *, absolute: bool = False
+) -> list[PathItem]:
     """应用六类排除开关（文件/目录/符号链接/只读/隐藏/系统）。
 
     符号链接用 ``islink`` 而非存在性；隐藏/系统/只读 Windows 按属性位，
@@ -176,12 +197,20 @@ def apply_excludes(items: list[PathItem], exclude) -> list[PathItem]:
             continue
         if exclude.dirs and os.path.isdir(p):
             continue
-        if exclude.symlinks and os.path.islink(p):
+        link_path = (p.rstrip(os.sep + (os.altsep or "")) or p) if absolute else p
+        if exclude.symlinks and os.path.islink(link_path):
             continue
         if exclude.readonly and fileattr.is_readonly(p):
             continue
-        if exclude.hidden and fileattr.is_hidden(p):
-            continue
+        if exclude.hidden:
+            hidden_path = p
+            if absolute and os.name == "posix":
+                # A final dot segment names the referenced directory for hidden filtering.
+                hidden_path = link_path
+                if os.path.basename(link_path) in (".", ".."):
+                    hidden_path = os.path.realpath(link_path)
+            if fileattr.is_hidden(hidden_path):
+                continue
         if exclude.system and fileattr.is_system(p):
             continue
         out.append(item)
